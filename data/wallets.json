@@ -1,0 +1,52 @@
+{
+  "user_id": "user_alex_01",
+  "point_valuation_cents": {
+    "chase_ur": 1.8,
+    "amex_mr": 1.7,
+    "citi_ty": 1.6,
+    "cash": 1.0
+  },
+  "cards": [
+    {
+      "card_id": "chase_sapphire_reserve",
+      "card_name": "Chase Sapphire Reserve",
+      "issuer": "Chase",
+      "base_multipliers": {
+        "travel": 3.0,
+        "dining": 3.0,
+        "default": 1.0
+      },
+      "active_quarterly_categories": [],
+      "has_purchase_protection": true,
+      "has_extended_warranty": true,
+      "foreign_transaction_fee": 0.0
+    },
+    {
+      "card_id": "amex_gold",
+      "card_name": "American Express Gold Card",
+      "issuer": "American Express",
+      "base_multipliers": {
+        "dining": 4.0,
+        "groceries": 4.0,
+        "travel": 3.0,
+        "default": 1.0
+      },
+      "active_quarterly_categories": [],
+      "has_purchase_protection": true,
+      "has_extended_warranty": false,
+      "foreign_transaction_fee": 0.0
+    },
+    {
+      "card_id": "citi_double_cash",
+      "card_name": "Citi Double Cash",
+      "issuer": "Citi",
+      "base_multipliers": {
+        "default": 2.0
+      },
+      "active_quarterly_categories": [],
+      "has_purchase_protection": false,
+      "has_extended_warranty": false,
+      "foreign_transaction_fee": 3.0
+    }
+  ]
+}

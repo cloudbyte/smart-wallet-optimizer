@@ -1,0 +1,42 @@
+[
+  {
+    "raw_merchant_name": "Trader Joe's",
+    "canonical_name": "Trader Joe's",
+    "mcc_code": "5411",
+    "primary_category": "groceries",
+    "qualifies_for_supermarket_multipliers": true,
+    "notes": "Standalone grocery store"
+  },
+  {
+    "raw_merchant_name": "Walmart Supercenter",
+    "canonical_name": "Walmart",
+    "mcc_code": "5311",
+    "primary_category": "wholesale_department",
+    "qualifies_for_supermarket_multipliers": false,
+    "notes": "Superstore/Department store exclusion for grocery multipliers"
+  },
+  {
+    "raw_merchant_name": "Delta Air Lines",
+    "canonical_name": "Delta Air Lines",
+    "mcc_code": "4511",
+    "primary_category": "travel",
+    "qualifies_for_supermarket_multipliers": false,
+    "notes": "Direct airline booking"
+  },
+  {
+    "raw_merchant_name": "Shell Oil",
+    "canonical_name": "Shell",
+    "mcc_code": "5541",
+    "primary_category": "gas",
+    "qualifies_for_supermarket_multipliers": false,
+    "notes": "Gas station & EV charging"
+  },
+  {
+    "raw_merchant_name": "The Capital Grille",
+    "canonical_name": "The Capital Grille",
+    "mcc_code": "5812",
+    "primary_category": "dining",
+    "qualifies_for_supermarket_multipliers": false,
+    "notes": "Fine dining restaurant"
+  }
+]
