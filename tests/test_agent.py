@@ -11,6 +11,12 @@ def test_location_resolver():
     assert ctx.inferred_category == "groceries"
     assert ctx.is_ambiguous is False
 
+def test_location_resolver_lat_lon():
+    # Lat/Lon for Starbucks or arbitrary venue via OpenStreetMap reverse geocoding
+    ctx = resolve_location(LocationInput(latitude=37.7749, longitude=-122.4194))
+    assert ctx.venue_name is not None
+    assert ctx.confidence_score > 0.0
+
 def test_merchant_lookup():
     details = lookup_merchant(MerchantLookupInput(raw_merchant_name="Walmart Supercenter"))
     assert details.canonical_name == "Walmart"
