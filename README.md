@@ -51,9 +51,11 @@ interactive demo. Re-running the clone cell removes the existing
 `smart-wallet-optimizer` directory at the notebook's current location before
 cloning again.
 
-With a GPU runtime, the notebook selects Qwen3-4B from Hugging Face (about 8 GB).
-Without a GPU, it selects Qwen3-0.6B on CPU instead of offloading the larger
-model to CPU/disk, which can make inference extremely slow. Free-tier GPU
+With a GPU runtime, the notebook selects Qwen3-4B from Hugging Face using
+4-bit quantization to reduce VRAM use. It also caps each prompt at 2,048 tokens
+to limit inference memory. Without a GPU, it selects Qwen3-0.6B on CPU instead
+of offloading the larger model to CPU/disk, which can make inference extremely
+slow. Free-tier GPU
 availability depends on the current quota. Local runs also default to the
 smaller Qwen3-0.6B model, which is practical for CPU testing but still
 downloads the model weights on first use. Set

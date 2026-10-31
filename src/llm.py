@@ -8,7 +8,9 @@ LOCAL_MODEL_ID = "Qwen/Qwen3-0.6B"
 COLAB_MODEL_ID = "Qwen/Qwen3-4B"
 MODEL_ENV_VAR = "WALLET_AGENT_MODEL"
 DEVICE_ENV_VAR = "WALLET_AGENT_DEVICE"
+FOUR_BIT_ENV_VAR = "WALLET_AGENT_4BIT"
 DEFAULT_EMBEDDING_MODEL_ID = "sentence-transformers/all-MiniLM-L6-v2"
+MAX_INPUT_TOKENS = 2048
 
 
 def is_colab_runtime() -> bool:
@@ -34,9 +36,16 @@ class Qwen3AgentModel:
         self,
         model_id: Optional[str] = None,
         device: Optional[str] = None,
+        load_in_4bit: Optional[bool] = None,
     ):
         self.model_id = model_id or default_model_id()
         self.device = device or default_device()
+        self.load_in_4bit = (
+            load_in_4bit
+            if load_in_4bit is not None
+            else os.environ.get(FOUR_BIT_ENV_VAR, "").casefold()
+            in {"1", "true", "yes"}
+        )
         self._tokenizer = None
         self._model = None
         self.embedding_model_id = DEFAULT_EMBEDDING_MODEL_ID
@@ -49,14 +58,26 @@ class Qwen3AgentModel:
             from transformers import AutoModelForCausalLM, AutoTokenizer
 
             self._tokenizer = AutoTokenizer.from_pretrained(self.model_id)
-            self._model = AutoModelForCausalLM.from_pretrained(
-                self.model_id,
-                torch_dtype=(
+            model_options = {
+                "torch_dtype": (
                     torch.float16
                     if self.device != "cpu" and torch.cuda.is_available()
                     else torch.float32
                 ),
-                device_map=self.device,
+                "device_map": self.device,
+            }
+            if self.load_in_4bit and torch.cuda.is_available():
+                from transformers import BitsAndBytesConfig
+
+                model_options["quantization_config"] = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_quant_type="nf4",
+                    bnb_4bit_use_double_quant=True,
+                    bnb_4bit_compute_dtype=torch.float16,
+                )
+            self._model = AutoModelForCausalLM.from_pretrained(
+                self.model_id,
+                **model_options,
             )
             self._model.eval()
 
@@ -168,6 +189,8 @@ class Qwen3AgentModel:
             tokenize=True,
             add_generation_prompt=True,
             enable_thinking=False,
+            truncation=True,
+            max_length=MAX_INPUT_TOKENS,
             return_dict=True,
             return_tensors="pt",
         ).to(self._model.device)

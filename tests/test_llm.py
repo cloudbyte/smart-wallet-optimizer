@@ -50,3 +50,10 @@ def test_explicit_constructor_values_override_environment(monkeypatch):
 
     assert model.model_id == "org/explicit-model"
     assert model.device == "cpu"
+
+
+def test_four_bit_quantization_can_be_enabled_from_environment(monkeypatch):
+    monkeypatch.setenv("WALLET_AGENT_4BIT", "true")
+
+    assert Qwen3AgentModel().load_in_4bit
+    assert not Qwen3AgentModel(load_in_4bit=False).load_in_4bit
