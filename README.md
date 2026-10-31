@@ -51,11 +51,12 @@ interactive demo. Re-running the clone cell removes the existing
 `smart-wallet-optimizer` directory at the notebook's current location before
 cloning again.
 
-The notebook selects Qwen3-4B from Hugging Face (about 8 GB) and loads it into
-memory. Use a Colab GPU runtime; free-tier GPU availability depends on the
-current quota, and CPU-only generation may be impractically slow or run out of
-memory. Local runs default to the smaller Qwen3-0.6B model, which is practical
-for CPU testing but still downloads the model weights on first use. Set
+With a GPU runtime, the notebook selects Qwen3-4B from Hugging Face (about 8 GB).
+Without a GPU, it selects Qwen3-0.6B on CPU instead of offloading the larger
+model to CPU/disk, which can make inference extremely slow. Free-tier GPU
+availability depends on the current quota. Local runs also default to the
+smaller Qwen3-0.6B model, which is practical for CPU testing but still
+downloads the model weights on first use. Set
 `WALLET_AGENT_MODEL` and `WALLET_AGENT_DEVICE` to override the defaults. RAG
 additionally downloads the compact
 `sentence-transformers/all-MiniLM-L6-v2` embedding model (about 90 MB) on first
