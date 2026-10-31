@@ -1,9 +1,10 @@
 import sys
 from src.agent import SmartWalletAgent
+from src.llm import Qwen3AgentModel
 from src.models import TransactionEvaluationRequest
 
 def main():
-    print("=== Smart Wallet Rewards Optimizer (Mock Evaluation) ===")
+    print("=== Smart Wallet Rewards Optimizer (Qwen3 LLM Agent) ===")
     merchant = input("Enter merchant name (e.g., Trader Joe's, Delta Air Lines, Walmart): ").strip() or "Trader Joe's"
     try:
         amount = float(input("Enter transaction amount ($): ").strip() or "75.50")
@@ -13,7 +14,7 @@ def main():
     is_intl_input = input("Is this an international transaction? (y/N): ").strip().lower()
     is_international = is_intl_input in ["y", "yes"]
 
-    agent = SmartWalletAgent()
+    agent = SmartWalletAgent(explainer=Qwen3AgentModel())
     req = TransactionEvaluationRequest(
         merchant_name=merchant,
         amount=amount,
@@ -23,6 +24,10 @@ def main():
     res = agent.evaluate_transaction(req)
 
     print("\n--- EVALUATION RESULTS ---")
+    if res.assistant_message:
+        print(f"\n🤖 AI-generated summary (informational): {res.assistant_message}")
+    if res.tree_assessment:
+        print(f"\n🧠 LLM ToT critic: {res.tree_assessment}")
     print(f"Merchant: {res.merchant_canonical_name} (MCC: {res.mcc_code}, Category: {res.primary_category})")
     if res.recommended_card:
         print(f"\n✨ Recommended Card: {res.recommended_card.card_name}")

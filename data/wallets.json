@@ -4,6 +4,7 @@
     "chase_ur": 1.8,
     "amex_mr": 1.7,
     "citi_ty": 1.6,
+    "capital_one_miles": 1.0,
     "cash": 1.0
   },
   "tie_break_preference": "travel_points",
@@ -39,6 +40,19 @@
       "has_extended_warranty": false,
       "foreign_transaction_fee": 0.0,
       "purchase_protection_value_rate": 0.02
+    },
+    {
+      "card_id": "capital_one_venture_x",
+      "card_name": "Capital One Venture X",
+      "issuer": "Capital One",
+      "base_multipliers": {
+        "default": 2.0,
+        "travel": 2.0
+      },
+      "active_quarterly_categories": [],
+      "has_purchase_protection": true,
+      "has_extended_warranty": true,
+      "foreign_transaction_fee": 0.0
     },
     {
       "card_id": "citi_double_cash",

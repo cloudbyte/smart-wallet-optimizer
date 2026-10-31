@@ -74,6 +74,8 @@ class TransactionEvaluationResponse(BaseModel):
     primary_category: str
     recommended_card: Optional[CardRecommendation]
     alternative_cards: List[CardRecommendation]
+    assistant_message: Optional[str] = None
+    tree_assessment: Optional[str] = None
     requires_approval: bool = False
     approval_reason: Optional[str] = None
     audit_trail: List[str] = Field(default_factory=list)
