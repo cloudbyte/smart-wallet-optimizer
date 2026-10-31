@@ -2,41 +2,311 @@
   {
     "raw_merchant_name": "Trader Joe's",
     "canonical_name": "Trader Joe's",
+    "aliases": ["Trader Joes", "TJ's", "TJs"],
     "mcc_code": "5411",
     "primary_category": "groceries",
     "qualifies_for_supermarket_multipliers": true,
     "notes": "Standalone grocery store"
   },
   {
+    "raw_merchant_name": "Aldi",
+    "canonical_name": "ALDI",
+    "aliases": ["Aldi"],
+    "mcc_code": "5411",
+    "primary_category": "groceries",
+    "qualifies_for_supermarket_multipliers": true,
+    "notes": "Grocery retailer; verify card-specific merchant coding"
+  },
+  {
+    "raw_merchant_name": "Kroger",
+    "canonical_name": "Kroger",
+    "aliases": ["Kroger Marketplace"],
+    "mcc_code": "5411",
+    "primary_category": "groceries",
+    "qualifies_for_supermarket_multipliers": true,
+    "notes": "Grocery store; fuel, pharmacy, and other departments may code differently"
+  },
+  {
+    "raw_merchant_name": "Whole Foods Market",
+    "canonical_name": "Whole Foods Market",
+    "aliases": ["Whole Foods"],
+    "mcc_code": "5411",
+    "primary_category": "groceries",
+    "qualifies_for_supermarket_multipliers": true,
+    "notes": "Grocery retailer; verify card-specific merchant coding"
+  },
+  {
+    "raw_merchant_name": "Safeway",
+    "canonical_name": "Safeway",
+    "aliases": ["Safeway Grocery"],
+    "mcc_code": "5411",
+    "primary_category": "groceries",
+    "qualifies_for_supermarket_multipliers": true,
+    "notes": "Grocery store; fuel and pharmacy may code differently"
+  },
+  {
+    "raw_merchant_name": "Publix",
+    "canonical_name": "Publix",
+    "aliases": ["Publix Super Market"],
+    "mcc_code": "5411",
+    "primary_category": "groceries",
+    "qualifies_for_supermarket_multipliers": true,
+    "notes": "Grocery store; in-store services may code differently"
+  },
+  {
+    "raw_merchant_name": "Costco Wholesale",
+    "canonical_name": "Costco",
+    "aliases": ["Costco", "Costco Wholesale Corporation"],
+    "mcc_code": "5300",
+    "primary_category": "wholesale_department",
+    "qualifies_for_supermarket_multipliers": false,
+    "notes": "Warehouse club; fuel and pharmacy transactions may use different merchant coding"
+  },
+  {
+    "raw_merchant_name": "Sam's Club",
+    "canonical_name": "Sam's Club",
+    "aliases": ["Sams Club"],
+    "mcc_code": "5300",
+    "primary_category": "wholesale_department",
+    "qualifies_for_supermarket_multipliers": false,
+    "notes": "Warehouse club; fuel and pharmacy transactions may use different merchant coding"
+  },
+  {
     "raw_merchant_name": "Walmart Supercenter",
     "canonical_name": "Walmart",
+    "aliases": ["Walmart Supercenter", "Walmart"],
     "mcc_code": "5311",
     "primary_category": "wholesale_department",
     "qualifies_for_supermarket_multipliers": false,
-    "notes": "Superstore/Department store exclusion for grocery multipliers"
+    "notes": "Superstore/department store exclusion for grocery multipliers; departments may code differently",
+    "requires_confirmation": true
+  },
+  {
+    "raw_merchant_name": "Target",
+    "canonical_name": "Target",
+    "aliases": ["Target Store", "Target Supercenter"],
+    "mcc_code": "5310",
+    "primary_category": "wholesale_department",
+    "qualifies_for_supermarket_multipliers": false,
+    "notes": "Discount department store; departments and locations may code differently",
+    "requires_confirmation": true
+  },
+  {
+    "raw_merchant_name": "Best Buy",
+    "canonical_name": "Best Buy",
+    "aliases": ["BestBuy"],
+    "mcc_code": "5732",
+    "primary_category": "electronics",
+    "qualifies_for_supermarket_multipliers": false,
+    "notes": "Electronics retailer"
+  },
+  {
+    "raw_merchant_name": "The Home Depot",
+    "canonical_name": "The Home Depot",
+    "aliases": ["Home Depot"],
+    "mcc_code": "5200",
+    "primary_category": "home_improvement",
+    "qualifies_for_supermarket_multipliers": false,
+    "notes": "Home improvement retailer"
+  },
+  {
+    "raw_merchant_name": "Lowe's",
+    "canonical_name": "Lowe's",
+    "aliases": ["Lowes"],
+    "mcc_code": "5200",
+    "primary_category": "home_improvement",
+    "qualifies_for_supermarket_multipliers": false,
+    "notes": "Home improvement retailer"
+  },
+  {
+    "raw_merchant_name": "CVS Pharmacy",
+    "canonical_name": "CVS",
+    "aliases": ["CVS", "CVS/pharmacy"],
+    "mcc_code": "5912",
+    "primary_category": "pharmacy",
+    "qualifies_for_supermarket_multipliers": false,
+    "notes": "Pharmacy; front-store purchases and pharmacy services may code differently",
+    "requires_confirmation": true
+  },
+  {
+    "raw_merchant_name": "Walgreens",
+    "canonical_name": "Walgreens",
+    "aliases": ["Walgreens Pharmacy"],
+    "mcc_code": "5912",
+    "primary_category": "pharmacy",
+    "qualifies_for_supermarket_multipliers": false,
+    "notes": "Pharmacy; front-store purchases and pharmacy services may code differently",
+    "requires_confirmation": true
   },
   {
     "raw_merchant_name": "Delta Air Lines",
     "canonical_name": "Delta Air Lines",
+    "aliases": ["Delta", "Delta Airlines"],
     "mcc_code": "4511",
     "primary_category": "travel",
     "qualifies_for_supermarket_multipliers": false,
     "notes": "Direct airline booking"
   },
   {
+    "raw_merchant_name": "United Airlines",
+    "canonical_name": "United Airlines",
+    "aliases": ["United"],
+    "mcc_code": "4511",
+    "primary_category": "travel",
+    "qualifies_for_supermarket_multipliers": false,
+    "notes": "Direct airline booking"
+  },
+  {
+    "raw_merchant_name": "American Airlines",
+    "canonical_name": "American Airlines",
+    "aliases": ["American"],
+    "mcc_code": "4511",
+    "primary_category": "travel",
+    "qualifies_for_supermarket_multipliers": false,
+    "notes": "Direct airline booking"
+  },
+  {
+    "raw_merchant_name": "Southwest Airlines",
+    "canonical_name": "Southwest Airlines",
+    "aliases": ["Southwest"],
+    "mcc_code": "4511",
+    "primary_category": "travel",
+    "qualifies_for_supermarket_multipliers": false,
+    "notes": "Direct airline booking"
+  },
+  {
+    "raw_merchant_name": "Marriott",
+    "canonical_name": "Marriott",
+    "aliases": ["Marriott Hotels", "Marriott Bonvoy"],
+    "mcc_code": "7011",
+    "primary_category": "travel",
+    "qualifies_for_supermarket_multipliers": false,
+    "notes": "Hotel stay; property and booking channel can affect merchant coding",
+    "requires_confirmation": true
+  },
+  {
+    "raw_merchant_name": "Hilton",
+    "canonical_name": "Hilton",
+    "aliases": ["Hilton Hotels", "Hilton Honors"],
+    "mcc_code": "7011",
+    "primary_category": "travel",
+    "qualifies_for_supermarket_multipliers": false,
+    "notes": "Hotel stay; property and booking channel can affect merchant coding",
+    "requires_confirmation": true
+  },
+  {
+    "raw_merchant_name": "Uber",
+    "canonical_name": "Uber",
+    "aliases": ["Uber Ride", "Uber Rides"],
+    "mcc_code": "4121",
+    "primary_category": "travel",
+    "qualifies_for_supermarket_multipliers": false,
+    "notes": "Ride-hailing transportation only; Uber Eats is a separate merchant category",
+    "requires_confirmation": true
+  },
+  {
+    "raw_merchant_name": "Lyft",
+    "canonical_name": "Lyft",
+    "aliases": ["Lyft Ride", "Lyft Rides"],
+    "mcc_code": "4121",
+    "primary_category": "travel",
+    "qualifies_for_supermarket_multipliers": false,
+    "notes": "Ride-hailing transportation"
+  },
+  {
     "raw_merchant_name": "Shell Oil",
     "canonical_name": "Shell",
+    "aliases": ["Shell Gas", "Shell Station"],
     "mcc_code": "5541",
     "primary_category": "gas",
     "qualifies_for_supermarket_multipliers": false,
-    "notes": "Gas station & EV charging"
+    "notes": "Gas station and EV charging; convenience-store purchases may code differently",
+    "requires_confirmation": true
+  },
+  {
+    "raw_merchant_name": "Chevron",
+    "canonical_name": "Chevron",
+    "aliases": ["Chevron Gas"],
+    "mcc_code": "5541",
+    "primary_category": "gas",
+    "qualifies_for_supermarket_multipliers": false,
+    "notes": "Gas station; convenience-store purchases may code differently",
+    "requires_confirmation": true
+  },
+  {
+    "raw_merchant_name": "Exxon Mobil",
+    "canonical_name": "Exxon",
+    "aliases": ["Exxon", "Mobil"],
+    "mcc_code": "5541",
+    "primary_category": "gas",
+    "qualifies_for_supermarket_multipliers": false,
+    "notes": "Gas station; convenience-store purchases may code differently",
+    "requires_confirmation": true
+  },
+  {
+    "raw_merchant_name": "Starbucks",
+    "canonical_name": "Starbucks",
+    "aliases": ["Starbucks Coffee"],
+    "mcc_code": "5814",
+    "primary_category": "dining",
+    "qualifies_for_supermarket_multipliers": false,
+    "notes": "Coffee shop; grocery and third-party delivery purchases may code differently",
+    "requires_confirmation": true
+  },
+  {
+    "raw_merchant_name": "McDonald's",
+    "canonical_name": "McDonald's",
+    "aliases": ["McDonalds"],
+    "mcc_code": "5814",
+    "primary_category": "dining",
+    "qualifies_for_supermarket_multipliers": false,
+    "notes": "Quick-service restaurant"
+  },
+  {
+    "raw_merchant_name": "Chipotle",
+    "canonical_name": "Chipotle",
+    "aliases": ["Chipotle Mexican Grill"],
+    "mcc_code": "5812",
+    "primary_category": "dining",
+    "qualifies_for_supermarket_multipliers": false,
+    "notes": "Restaurant"
+  },
+  {
+    "raw_merchant_name": "Subway",
+    "canonical_name": "Subway",
+    "aliases": ["Subway Restaurants"],
+    "mcc_code": "5814",
+    "primary_category": "dining",
+    "qualifies_for_supermarket_multipliers": false,
+    "notes": "Quick-service restaurant"
   },
   {
     "raw_merchant_name": "The Capital Grille",
     "canonical_name": "The Capital Grille",
+    "aliases": ["Capital Grille"],
     "mcc_code": "5812",
     "primary_category": "dining",
     "qualifies_for_supermarket_multipliers": false,
     "notes": "Fine dining restaurant"
+  },
+  {
+    "raw_merchant_name": "Netflix",
+    "canonical_name": "Netflix",
+    "aliases": ["Netflix Streaming"],
+    "mcc_code": "4899",
+    "primary_category": "subscriptions",
+    "qualifies_for_supermarket_multipliers": false,
+    "notes": "Streaming subscription; billing through a third party may change merchant coding",
+    "requires_confirmation": true
+  },
+  {
+    "raw_merchant_name": "Delta Hotels by Marriott",
+    "canonical_name": "Delta Hotels",
+    "aliases": [],
+    "mcc_code": "7011",
+    "primary_category": "travel",
+    "qualifies_for_supermarket_multipliers": false,
+    "notes": "Hotel brand; distinct from Delta Air Lines; property and booking channel can affect merchant coding",
+    "requires_confirmation": true
   }
 ]

@@ -25,6 +25,8 @@ class MerchantDetails(BaseModel):
     primary_category: str
     qualifies_for_supermarket_multipliers: bool
     notes: Optional[str] = None
+    aliases: List[str] = Field(default_factory=list)
+    requires_confirmation: bool = False
     resolution_method: Literal[
         "catalog_exact", "ai_candidate", "unresolved"
     ] = "catalog_exact"

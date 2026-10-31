@@ -32,10 +32,12 @@ def lookup_merchant(
         for entry in merchants
     ]
     for entry, merchant in catalog:
-        if query in {
+        known_names = {
             entry["raw_merchant_name"].strip().casefold(),
             merchant.canonical_name.strip().casefold(),
-        }:
+            *(alias.strip().casefold() for alias in merchant.aliases),
+        }
+        if query in known_names:
             return merchant
 
     if resolver is not None:
@@ -46,6 +48,7 @@ def lookup_merchant(
                 for name in (
                     merchant.canonical_name,
                     entry["raw_merchant_name"].strip(),
+                    *merchant.aliases,
                 )
             )
         )
@@ -63,6 +66,7 @@ def lookup_merchant(
                     in {
                         merchant.canonical_name,
                         entry["raw_merchant_name"].strip(),
+                        *merchant.aliases,
                     }
                 ),
                 None,

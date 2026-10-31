@@ -126,8 +126,9 @@ hard pruning, and approval triggers remain deterministic.
 
 ## Data and Configuration
 
-- [`data/merchants.json`](./data/merchants.json) maps sample merchant names to
-  categories and supermarket eligibility.
+- [`data/merchants.json`](./data/merchants.json) contains a synthetic catalog
+  of common grocery, wholesale, retail, pharmacy, dining, travel, gas, and
+  subscription merchants, including aliases and MCC/category metadata.
 - [`data/wallets.json`](./data/wallets.json) defines the sample user's cards,
   reward multipliers, point valuations, and preference for tie-breaking.
 - [`data/benefit_sources.json`](./data/benefit_sources.json) lists official
@@ -140,8 +141,11 @@ hard pruning, and approval triggers remain deterministic.
   wallet data are illustrative fractions of the transaction amount, not
   guarantees or actuarial valuations.
 
-merchant and wallet data are synthetic. AI merchant resolution cannot add
-catalog entries or invent MCC/category values. Location resolution has offline
+Merchant records and category mappings are illustrative, not authoritative:
+MCCs can vary by location, department, payment channel, or transaction type.
+Several entries are flagged for confirmation for that reason. AI merchant
+resolution cannot add catalog entries or invent MCC/category values. Location
+resolution has offline
 shortcuts for sample venues and may query OpenStreetMap Nominatim for other
 inputs when network access is available.
 

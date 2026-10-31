@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 import requests
@@ -6,6 +7,7 @@ from src.agent import SmartWalletAgent
 from src import main as cli
 from src.models import (
     LocationContext,
+    MerchantDetails,
     MerchantResolution,
     TransactionEvaluationRequest,
     UserWallet,
@@ -83,6 +85,36 @@ def test_merchant_lookup():
     assert details.qualifies_for_supermarket_multipliers is False
 
 
+def test_merchant_catalog_has_expanded_valid_records():
+    catalog_path = Path(__file__).resolve().parents[1] / "data" / "merchants.json"
+    records = json.loads(catalog_path.read_text(encoding="utf-8"))
+    assert len(records) >= 25
+    for record in records:
+        details = MerchantDetails.model_validate(record)
+        assert details.mcc_code.isdigit()
+        assert details.primary_category
+
+
+@pytest.mark.parametrize(
+    ("merchant_name", "canonical_name", "category"),
+    [
+        ("Whole Foods", "Whole Foods Market", "groceries"),
+        ("Costco", "Costco", "wholesale_department"),
+        ("United", "United Airlines", "travel"),
+        ("McDonalds", "McDonald's", "dining"),
+        ("Walgreens Pharmacy", "Walgreens", "pharmacy"),
+        ("Delta Hotels", "Delta Hotels", "travel"),
+    ],
+)
+def test_merchant_catalog_resolves_common_aliases(
+    merchant_name, canonical_name, category
+):
+    merchant = lookup_merchant(MerchantLookupInput(raw_merchant_name=merchant_name))
+
+    assert merchant.canonical_name == canonical_name
+    assert merchant.primary_category == category
+
+
 def test_unknown_short_merchant_query_does_not_match_arbitrary_name():
     details = lookup_merchant(MerchantLookupInput(raw_merchant_name="art"))
 
@@ -98,9 +130,11 @@ def test_ai_merchant_match_is_catalog_grounded_and_requires_confirmation():
         observed["candidates"] = candidates
         return MerchantResolution(canonical_name="Trader Joe's", confidence=0.94)
 
-    details = lookup_merchant(MerchantLookupInput(raw_merchant_name="TJ's"), resolver)
+    details = lookup_merchant(
+        MerchantLookupInput(raw_merchant_name="TJ grocery store"), resolver
+    )
 
-    assert observed["merchant_name"] == "TJ's"
+    assert observed["merchant_name"] == "TJ grocery store"
     assert "Trader Joe's" in observed["candidates"]
     assert details.canonical_name == "Trader Joe's"
     assert details.mcc_code == "5411"
@@ -149,7 +183,7 @@ def test_ai_resolved_merchant_requires_human_confirmation_in_agent(monkeypatch):
     agent = make_agent(explainer=MerchantResolverModel())
 
     response = agent.evaluate_transaction(
-        TransactionEvaluationRequest(merchant_name="TJ's", amount=100.0)
+        TransactionEvaluationRequest(merchant_name="TJ grocery store", amount=100.0)
     )
 
     assert response.mcc_code == "5411"
