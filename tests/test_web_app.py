@@ -7,10 +7,11 @@ def test_streamlit_app_loads_form_without_loading_model():
     app = AppTest.from_file("src/web_app.py").run()
 
     assert not app.exception
-    assert app.title[0].value == "Smart Wallet Rewards Optimizer"
-    assert any("Demo using synthetic wallet data." in item.value for item in app.caption)
+    assert app.title[0].value == "💳 Smart Wallet"
+    assert any("Demo with synthetic wallet data." in item.value for item in app.caption)
+    assert any("Rewards, made easier." in item.value for item in app.markdown)
     assert app.text_input[0].label == "Merchant"
-    assert app.button[0].label == "Recommend a card"
+    assert app.button[0].label == "Find my best card  →"
 
 
 def test_streamlit_app_renders_structured_recommendation():

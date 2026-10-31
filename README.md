@@ -50,8 +50,10 @@ confirm current eligibility and terms with the issuer.
 
 Open [`Smart_Wallet_Rewards_Optimizer_Colab.ipynb`](./Smart_Wallet_Rewards_Optimizer_Colab.ipynb) in Google Colab and run its cells
 from top to bottom. The setup cell clones a fresh copy of the GitHub project on
-every run, installs the dependencies, runs the test suite, and starts the
-interactive demo. Re-running the clone cell removes the existing
+every run, installs the dependencies, and runs the test suite. The final cell
+starts the Streamlit web app and displays a Colab link to open it. Keep the
+Colab runtime connected while using the app; stopping the runtime stops the
+web app as well. Re-running the clone cell removes the existing
 `smart-wallet-optimizer` directory at the notebook's current location before
 cloning again.
 
