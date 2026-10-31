@@ -24,10 +24,13 @@ def main():
 
     print("\n--- EVALUATION RESULTS ---")
     print(f"Merchant: {res.merchant_canonical_name} (MCC: {res.mcc_code}, Category: {res.primary_category})")
-    print(f"\n✨ Recommended Card: {res.recommended_card.card_name}")
-    print(f"   Net Value: {res.recommended_card.net_value_cents:.1f}¢ ($ {res.recommended_card.net_value_cents/100:.2f})")
-    print(f"   Rationale: {res.recommended_card.rationale}")
-    print(f"   Perks: Purchase Protection: {'Yes' if res.recommended_card.has_purchase_protection else 'No'} | Extended Warranty: {'Yes' if res.recommended_card.has_extended_warranty else 'No'}")
+    if res.recommended_card:
+        print(f"\n✨ Recommended Card: {res.recommended_card.card_name}")
+        print(f"   Net Value: {res.recommended_card.net_value_cents:.1f}¢ ($ {res.recommended_card.net_value_cents/100:.2f})")
+        print(f"   Rationale: {res.recommended_card.rationale}")
+        print(f"   Perks: Purchase Protection: {'Yes' if res.recommended_card.has_purchase_protection else 'No'} | Extended Warranty: {'Yes' if res.recommended_card.has_extended_warranty else 'No'}")
+    else:
+        print("\n⚠️  No eligible card recommendation is available.")
 
     if res.alternative_cards:
         print("\n💳 Alternatives:")
@@ -36,6 +39,18 @@ def main():
 
     if res.requires_approval:
         print(f"\n⚠️  APPROVAL REQUIRED: {res.approval_reason}")
+
+    print("\n🌳 ToT Evaluation:")
+    for node in res.reasoning_tree:
+        net_value = (
+            f", net {node.net_value_cents:.1f}¢"
+            if node.net_value_cents is not None
+            else ""
+        )
+        print(
+            f"   - Depth {node.depth} | {node.card_id} | {node.status}"
+            f"{net_value}"
+        )
 
     print("\n📋 Audit Trail:")
     for step in res.audit_trail:

@@ -6,6 +6,7 @@
     "citi_ty": 1.6,
     "cash": 1.0
   },
+  "tie_break_preference": "travel_points",
   "cards": [
     {
       "card_id": "chase_sapphire_reserve",
@@ -19,7 +20,9 @@
       "active_quarterly_categories": [],
       "has_purchase_protection": true,
       "has_extended_warranty": true,
-      "foreign_transaction_fee": 0.0
+      "foreign_transaction_fee": 0.0,
+      "purchase_protection_value_rate": 0.02,
+      "extended_warranty_value_rate": 0.01
     },
     {
       "card_id": "amex_gold",
@@ -34,7 +37,8 @@
       "active_quarterly_categories": [],
       "has_purchase_protection": true,
       "has_extended_warranty": false,
-      "foreign_transaction_fee": 0.0
+      "foreign_transaction_fee": 0.0,
+      "purchase_protection_value_rate": 0.02
     },
     {
       "card_id": "citi_double_cash",
