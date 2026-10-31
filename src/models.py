@@ -31,7 +31,6 @@ class MerchantDetails(BaseModel):
         "catalog_exact", "ai_candidate", "unresolved"
     ] = "catalog_exact"
     match_confidence: float = Field(1.0, ge=0.0, le=1.0)
-    requires_confirmation: bool = False
 
 
 class MerchantResolution(BaseModel):
