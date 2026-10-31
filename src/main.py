@@ -1,4 +1,5 @@
-import sys
+from pydantic import ValidationError
+
 from src.agent import SmartWalletAgent
 from src.llm import Qwen3AgentModel
 from src.models import TransactionEvaluationRequest
@@ -9,17 +10,23 @@ def main():
     try:
         amount = float(input("Enter transaction amount ($): ").strip() or "75.50")
     except ValueError:
-        amount = 75.50
+        print("Invalid amount: enter a positive number no greater than $50,000.")
+        return
         
     is_intl_input = input("Is this an international transaction? (y/N): ").strip().lower()
     is_international = is_intl_input in ["y", "yes"]
 
+    try:
+        req = TransactionEvaluationRequest(
+            merchant_name=merchant,
+            amount=amount,
+            is_international=is_international,
+        )
+    except ValidationError as error:
+        print(f"Invalid transaction: {error}")
+        return
+
     agent = SmartWalletAgent(explainer=Qwen3AgentModel())
-    req = TransactionEvaluationRequest(
-        merchant_name=merchant,
-        amount=amount,
-        is_international=is_international
-    )
 
     res = agent.evaluate_transaction(req)
 

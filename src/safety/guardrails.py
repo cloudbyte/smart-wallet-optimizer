@@ -16,6 +16,7 @@ def approval_reason(
     request: TransactionEvaluationRequest,
     location: LocationContext,
     has_recommendations: bool,
+    merchant_is_ambiguous: bool = False,
 ) -> Optional[str]:
     if not has_recommendations:
         return "No eligible wallet card remains after ToT constraint evaluation."
@@ -24,6 +25,8 @@ def approval_reason(
             f"Transaction amount (${request.amount}) exceeds "
             f"high-value threshold (${HIGH_VALUE_THRESHOLD_USD:,.0f})."
         )
+    if merchant_is_ambiguous:
+        return "Merchant category could not be verified from the local directory."
     if (
         location.confidence_score < LOCATION_CONFIDENCE_THRESHOLD
         or location.is_ambiguous

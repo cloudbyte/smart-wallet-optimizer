@@ -31,7 +31,17 @@ def _point_valuation_key(card: CreditCardProfile) -> str:
         return "amex_mr"
     if "capital_one" in card.card_id:
         return "capital_one_miles"
+    if "citi" in card.card_id:
+        return "citi_ty"
     return "cash"
+
+
+def _evidence_contains_benefit(evidence: str, benefit_name: str) -> bool:
+    passages = [
+        passage.partition("]\n")[2] if "]\n" in passage else passage
+        for passage in evidence.split("\n\n")
+    ]
+    return any(benefit_name.casefold() in passage.casefold() for passage in passages)
 
 
 def _recommendation(
@@ -164,11 +174,14 @@ def evaluate_wallet_tree(
             card.card_id,
             f"{category} purchase protection and extended warranty",
         )
-        evidence_lower = evidence.lower()
         perk_rate = 0.0
-        if card.has_purchase_protection and "purchase protection" in evidence_lower:
+        if card.has_purchase_protection and _evidence_contains_benefit(
+            evidence, "purchase protection"
+        ):
             perk_rate += card.purchase_protection_value_rate
-        if card.has_extended_warranty and "extended warranty" in evidence_lower:
+        if card.has_extended_warranty and _evidence_contains_benefit(
+            evidence, "extended warranty"
+        ):
             perk_rate += card.extended_warranty_value_rate
         branch.evidence = evidence
         branch.perk_value_cents = request.amount * perk_rate * 100.0

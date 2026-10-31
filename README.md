@@ -27,6 +27,8 @@ designed for local development and Google Colab.
   least the reward yield.
 - Flags transactions for human approval when the merchant context is uncertain,
   the amount exceeds the configured threshold, or no eligible card remains.
+- Rejects invalid transaction amounts outside the supported range
+  `0 < amount <= $50,000`.
 - Uses the selected Qwen3 model to choose tools, critique the reasoning tree,
   and explain the structured recommendation.
 - Includes an audit trail and structured evaluation tree in the result.

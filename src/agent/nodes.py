@@ -128,7 +128,8 @@ class TransactionAgentNodes:
             audit.append(
                 f"Tool resolve_location observation: {location.venue_name}; "
                 f"category={location.inferred_category}; "
-                f"confidence={location.confidence_score}."
+                f"confidence={location.confidence_score}; "
+                f"ambiguous={location.is_ambiguous}."
             )
         elif action == "lookup_merchant":
             merchant = lookup_merchant(
@@ -137,7 +138,8 @@ class TransactionAgentNodes:
             update["merchant"] = merchant
             audit.append(
                 f"Tool lookup_merchant observation: {merchant.canonical_name}; "
-                f"MCC={merchant.mcc_code}; category={merchant.primary_category}."
+                f"MCC={merchant.mcc_code}; category={merchant.primary_category}; "
+                f"notes={merchant.notes or 'none'}."
             )
         elif action == "get_wallet":
             wallet = get_user_wallet(self.user_id)
@@ -238,6 +240,7 @@ class TransactionAgentNodes:
             request=request,
             location=location,
             has_recommendations=bool(recommendations),
+            merchant_is_ambiguous=merchant.mcc_code == "5999",
         )
         if approval_reason_text:
             audit.append(f"HITL Triggered: {approval_reason_text}")
