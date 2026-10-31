@@ -236,7 +236,7 @@ class TransactionAgentNodes:
         )
         audit.extend(tree_audit)
         audit.append(
-            "Deterministic Tree-of-Thought evaluation complete: "
+            "Tree-of-Thought card evaluation complete: "
             f"{len(reasoning_tree)} nodes across "
             f"{len({node.depth for node in reasoning_tree})} depth(s)."
         )
@@ -245,13 +245,8 @@ class TransactionAgentNodes:
             request=request,
             location=location,
             has_recommendations=bool(recommendations),
-            merchant_is_ambiguous=(
-                merchant.requires_confirmation
-                or (
-                    request.category_hint is not None
-                    and request.category_hint != merchant.primary_category
-                )
-            ),
+            merchant=merchant,
+            requested_category=request.category_hint,
         )
         if approval_reason_text:
             audit.append(f"HITL Triggered: {approval_reason_text}")

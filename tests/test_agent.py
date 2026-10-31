@@ -189,8 +189,19 @@ def test_ai_resolved_merchant_requires_human_confirmation_in_agent(monkeypatch):
     assert response.mcc_code == "5411"
     assert response.primary_category == "groceries"
     assert response.requires_approval
-    assert "needs confirmation" in response.approval_reason
+    assert "matched" in response.approval_reason
     assert any("resolution=ai_candidate" in item for item in response.audit_trail)
+
+
+def test_walmart_confirmation_explains_merchant_is_known_but_category_varies():
+    response = make_agent().evaluate_transaction(
+        TransactionEvaluationRequest(merchant_name="Walmart", amount=100.0)
+    )
+
+    assert response.requires_approval
+    assert response.merchant_canonical_name == "Walmart"
+    assert response.approval_reason.startswith("Walmart was recognized")
+    assert "may vary by department" in response.approval_reason
 
 
 def test_wallet_retrieval():
@@ -254,6 +265,11 @@ def test_agent_evaluation_groceries():
     # Amex Gold gives 4x on groceries, valued at 1.7¢/pt = 680¢
     assert res.recommended_card.card_id == "amex_gold"
     assert res.recommended_card.expected_yield_cents == 680.0
+    assert any(
+        item.startswith("Tree-of-Thought card evaluation complete")
+        for item in res.audit_trail
+    )
+    assert all("deterministic evaluator" not in item.casefold() for item in res.audit_trail)
 
 def test_agent_evaluation_travel():
     agent = make_agent()
@@ -280,7 +296,7 @@ def test_unknown_merchant_requires_approval_even_with_confident_location(monkeyp
     )
 
     assert response.requires_approval
-    assert "needs confirmation" in response.approval_reason
+    assert "couldn't match" in response.approval_reason
 
 
 def test_category_hint_cannot_override_catalog_category(monkeypatch):
