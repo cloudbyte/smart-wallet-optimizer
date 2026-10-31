@@ -34,7 +34,7 @@ def test_unverified_merchant_category_requires_approval():
         merchant_is_ambiguous=True,
     )
 
-    assert reason == "Merchant category could not be verified from the local directory."
+    assert reason == "Merchant match needs confirmation before relying on its category."
 
 
 def test_summary_grounding_rejects_unverified_numeric_claims():

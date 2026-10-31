@@ -26,7 +26,7 @@ def approval_reason(
             f"high-value threshold (${HIGH_VALUE_THRESHOLD_USD:,.0f})."
         )
     if merchant_is_ambiguous:
-        return "Merchant category could not be verified from the local directory."
+        return "Merchant match needs confirmation before relying on its category."
     if (
         location.confidence_score < LOCATION_CONFIDENCE_THRESHOLD
         or location.is_ambiguous

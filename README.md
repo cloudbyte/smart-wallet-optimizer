@@ -17,7 +17,9 @@ designed for local development and Google Colab.
 - Uses the LLM to choose among merchant, location, wallet, and benefit-retrieval
   tools; tool observations are added to LangGraph state for subsequent turns.
 - Resolves a merchant to a canonical name and spending category using the local
-  merchant dataset.
+  merchant dataset. When exact lookup fails, the LLM may select a candidate
+  from that catalog; MCC and category always come from the catalog, and
+  AI-matched names are flagged for human confirmation.
 - Loads a synthetic wallet and compares the reward yield of its eligible cards.
 - Downloads official card-benefit PDFs and issuer pages on demand, then retrieves
   card-filtered passages with a purpose-trained MiniLM embedder and MMR.
@@ -138,7 +140,8 @@ hard pruning, and approval triggers remain deterministic.
   wallet data are illustrative fractions of the transaction amount, not
   guarantees or actuarial valuations.
 
-Merchant and wallet data are synthetic. Location resolution has offline
+merchant and wallet data are synthetic. AI merchant resolution cannot add
+catalog entries or invent MCC/category values. Location resolution has offline
 shortcuts for sample venues and may query OpenStreetMap Nominatim for other
 inputs when network access is available.
 

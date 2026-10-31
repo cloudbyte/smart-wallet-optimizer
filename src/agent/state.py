@@ -3,6 +3,7 @@ from typing import Dict, List, Optional, Protocol, TypedDict
 from src.models import (
     LocationContext,
     MerchantDetails,
+    MerchantResolution,
     TransactionEvaluationRequest,
     TransactionEvaluationResponse,
     UserWallet,
@@ -13,6 +14,10 @@ class AgentLanguageModel(Protocol):
     def explain(self, facts: str) -> str: ...
 
     def choose_tool(self, context: str, available_actions: List[str]) -> Optional[str]: ...
+
+    def resolve_merchant(
+        self, merchant_name: str, candidates: List[str]
+    ) -> Optional[MerchantResolution]: ...
 
     def critique_tree(self, facts: str) -> str: ...
 

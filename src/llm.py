@@ -3,6 +3,8 @@ import os
 import sys
 from typing import List, Optional
 
+from src.models import MerchantResolution
+
 
 LOCAL_MODEL_ID = "Qwen/Qwen3-0.6B"
 COLAB_MODEL_ID = "Qwen/Qwen3-4B"
@@ -110,6 +112,29 @@ class Qwen3AgentModel:
             facts,
             max_new_tokens=96,
         )
+
+    def resolve_merchant(
+        self, merchant_name: str, candidates: List[str]
+    ) -> Optional[MerchantResolution]:
+        generated = self._generate(
+            "Resolve the user's merchant text to one entry from the supplied "
+            "catalog names. The catalog is authoritative. Do not invent merchant "
+            "names, MCCs, or categories. If no candidate is a clear match, return "
+            'exactly {"canonical_name": null, "confidence": 0.0}. Otherwise return '
+            'JSON with the exact catalog name and your match confidence from 0 to 1.',
+            json.dumps(
+                {"merchant_text": merchant_name, "catalog_names": candidates},
+                ensure_ascii=True,
+            ),
+            max_new_tokens=64,
+        )
+        try:
+            result = MerchantResolution.model_validate_json(generated)
+        except ValueError:
+            return None
+        if result.canonical_name not in candidates:
+            return None
+        return result
 
     def explain(self, facts: str) -> str:
         return self._generate(

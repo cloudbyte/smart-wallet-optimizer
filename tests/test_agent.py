@@ -4,7 +4,12 @@ import pytest
 import requests
 from src.agent import SmartWalletAgent
 from src import main as cli
-from src.models import LocationContext, TransactionEvaluationRequest, UserWallet
+from src.models import (
+    LocationContext,
+    MerchantResolution,
+    TransactionEvaluationRequest,
+    UserWallet,
+)
 from src.tools.location import resolve_location, LocationInput
 from src.tools.merchant import lookup_merchant, MerchantLookupInput
 from src.tools.wallet import get_user_wallet
@@ -83,6 +88,76 @@ def test_unknown_short_merchant_query_does_not_match_arbitrary_name():
 
     assert details.primary_category == "miscellaneous"
     assert details.mcc_code == "5999"
+
+
+def test_ai_merchant_match_is_catalog_grounded_and_requires_confirmation():
+    observed = {}
+
+    def resolver(merchant_name, candidates):
+        observed["merchant_name"] = merchant_name
+        observed["candidates"] = candidates
+        return MerchantResolution(canonical_name="Trader Joe's", confidence=0.94)
+
+    details = lookup_merchant(MerchantLookupInput(raw_merchant_name="TJ's"), resolver)
+
+    assert observed["merchant_name"] == "TJ's"
+    assert "Trader Joe's" in observed["candidates"]
+    assert details.canonical_name == "Trader Joe's"
+    assert details.mcc_code == "5411"
+    assert details.primary_category == "groceries"
+    assert details.resolution_method == "ai_candidate"
+    assert details.match_confidence == 0.94
+    assert details.requires_confirmation
+
+
+@pytest.mark.parametrize(
+    "resolution",
+    [
+        None,
+        MerchantResolution(canonical_name="Invented Merchant", confidence=1.0),
+        MerchantResolution(canonical_name="Trader Joe's", confidence=0.60),
+    ],
+)
+def test_ai_merchant_match_rejects_uncertain_or_non_catalog_candidates(resolution):
+    details = lookup_merchant(
+        MerchantLookupInput(raw_merchant_name="some grocery shop"),
+        lambda _name, _candidates: resolution,
+    )
+
+    assert details.resolution_method == "unresolved"
+    assert details.mcc_code == "5999"
+    assert details.requires_confirmation
+
+
+def test_ai_resolved_merchant_requires_human_confirmation_in_agent(monkeypatch):
+    class MerchantResolverModel:
+        def resolve_merchant(self, _merchant_name, _candidates):
+            return MerchantResolution(canonical_name="Trader Joe's", confidence=0.93)
+
+        def explain(self, _facts):
+            return "The American Express Gold Card matches this grocery purchase."
+
+    monkeypatch.setattr(
+        "src.agent.nodes.resolve_location",
+        lambda _input: LocationContext(
+            venue_name="Unknown venue",
+            inferred_category="miscellaneous",
+            is_ambiguous=True,
+            confidence_score=0.0,
+        ),
+    )
+    agent = make_agent(explainer=MerchantResolverModel())
+
+    response = agent.evaluate_transaction(
+        TransactionEvaluationRequest(merchant_name="TJ's", amount=100.0)
+    )
+
+    assert response.mcc_code == "5411"
+    assert response.primary_category == "groceries"
+    assert response.requires_approval
+    assert "needs confirmation" in response.approval_reason
+    assert any("resolution=ai_candidate" in item for item in response.audit_trail)
+
 
 def test_wallet_retrieval():
     wallet = get_user_wallet("user_alex_01")
@@ -171,7 +246,31 @@ def test_unknown_merchant_requires_approval_even_with_confident_location(monkeyp
     )
 
     assert response.requires_approval
-    assert "could not be verified" in response.approval_reason
+    assert "needs confirmation" in response.approval_reason
+
+
+def test_category_hint_cannot_override_catalog_category(monkeypatch):
+    monkeypatch.setattr(
+        "src.agent.nodes.resolve_location",
+        lambda _input: LocationContext(
+            venue_name="Trader Joe's",
+            inferred_category="groceries",
+            is_ambiguous=False,
+            confidence_score=0.98,
+        ),
+    )
+
+    response = make_agent().evaluate_transaction(
+        TransactionEvaluationRequest(
+            merchant_name="Trader Joe's",
+            amount=100.0,
+            category_hint="travel",
+        )
+    )
+
+    assert response.primary_category == "groceries"
+    assert response.recommended_card.card_id == "amex_gold"
+    assert response.requires_approval
 
 
 def test_agent_uses_explainer_with_structured_decision_facts():

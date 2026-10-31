@@ -132,13 +132,18 @@ class TransactionAgentNodes:
                 f"ambiguous={location.is_ambiguous}."
             )
         elif action == "lookup_merchant":
+            resolver = getattr(self.language_model, "resolve_merchant", None)
             merchant = lookup_merchant(
-                MerchantLookupInput(raw_merchant_name=request.merchant_name)
+                MerchantLookupInput(raw_merchant_name=request.merchant_name),
+                resolver=resolver if callable(resolver) else None,
             )
             update["merchant"] = merchant
             audit.append(
                 f"Tool lookup_merchant observation: {merchant.canonical_name}; "
                 f"MCC={merchant.mcc_code}; category={merchant.primary_category}; "
+                f"resolution={merchant.resolution_method}; "
+                f"confidence={merchant.match_confidence}; "
+                f"confirmation_required={merchant.requires_confirmation}; "
                 f"notes={merchant.notes or 'none'}."
             )
         elif action == "get_wallet":
@@ -156,7 +161,7 @@ class TransactionAgentNodes:
             wallet = state.get("wallet")
             if wallet is None or card_id not in {card.card_id for card in wallet.cards}:
                 raise ValueError(f"ReAct planner selected unknown card: {card_id}")
-            category = request.category_hint or state["merchant"].primary_category
+            category = state["merchant"].primary_category
             query = (
                 f"{category} purchase protection and extended warranty"
             )
@@ -186,7 +191,7 @@ class TransactionAgentNodes:
 
     def _prepare_benefit_queries(self, state: AgentState) -> AgentState:
         request = state["request"]
-        category = request.category_hint or state["merchant"].primary_category
+        category = state["merchant"].primary_category
         early_exit = (
             request.amount < LOW_VALUE_THRESHOLD_USD
             and not request.is_international
@@ -217,7 +222,7 @@ class TransactionAgentNodes:
         merchant = state["merchant"]
         wallet = state["wallet"]
         audit = state["audit_trail"]
-        category = request.category_hint or merchant.primary_category
+        category = merchant.primary_category
         recommendations, reasoning_tree, tree_audit = evaluate_wallet_tree(
             request=request,
             wallet=wallet,
@@ -240,7 +245,13 @@ class TransactionAgentNodes:
             request=request,
             location=location,
             has_recommendations=bool(recommendations),
-            merchant_is_ambiguous=merchant.mcc_code == "5999",
+            merchant_is_ambiguous=(
+                merchant.requires_confirmation
+                or (
+                    request.category_hint is not None
+                    and request.category_hint != merchant.primary_category
+                )
+            ),
         )
         if approval_reason_text:
             audit.append(f"HITL Triggered: {approval_reason_text}")

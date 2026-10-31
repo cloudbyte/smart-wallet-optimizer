@@ -25,6 +25,16 @@ class MerchantDetails(BaseModel):
     primary_category: str
     qualifies_for_supermarket_multipliers: bool
     notes: Optional[str] = None
+    resolution_method: Literal[
+        "catalog_exact", "ai_candidate", "unresolved"
+    ] = "catalog_exact"
+    match_confidence: float = Field(1.0, ge=0.0, le=1.0)
+    requires_confirmation: bool = False
+
+
+class MerchantResolution(BaseModel):
+    canonical_name: Optional[str]
+    confidence: float = Field(..., ge=0.0, le=1.0)
 
 class CreditCardProfile(BaseModel):
     card_id: str
