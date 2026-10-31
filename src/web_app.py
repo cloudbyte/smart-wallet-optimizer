@@ -31,11 +31,11 @@ def render_result(response: TransactionEvaluationResponse) -> None:
             second.metric("Estimated rewards", f"{recommendation.expected_yield_cents:.1f}¢")
             third.metric("Foreign fee", f"{recommendation.foreign_transaction_fee:.1f}%")
 
-    st.markdown("#### Purchase details")
-    merchant, category, mcc = st.columns(3)
-    merchant.metric("Merchant", response.merchant_canonical_name)
-    category.metric("Category", response.primary_category.replace("_", " ").title())
-    mcc.metric("Merchant category code", response.mcc_code)
+    st.caption(
+        f"Purchase · **{response.merchant_canonical_name}** · "
+        f"{response.primary_category.replace('_', ' ').title()} · "
+        f"MCC {response.mcc_code}"
+    )
 
     if response.assistant_message:
         st.info(response.assistant_message)
@@ -85,21 +85,107 @@ def main() -> None:
         page_icon="💳",
         layout="wide",
     )
-    st.title("💳 Smart Wallet")
-    st.markdown("### Rewards, made easier.")
-    st.caption(
-        "Compare your wallet's cards for a purchase and see why one may fit best."
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background:
+                radial-gradient(ellipse at 12% 0%, rgba(80, 95, 232, .11), transparent 34rem),
+                #f7f8fc;
+        }
+        .block-container {
+            max-width: 1040px;
+            padding-top: 1.5rem;
+            padding-bottom: 3rem;
+        }
+        .page-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin: 0 0 1.2rem;
+        }
+        .page-heading p {
+            margin: 0 0 .2rem;
+            color: #68769b;
+            font-size: .68rem;
+            font-weight: 700;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+        .page-heading h1 {
+            margin: 0;
+            color: #27324a;
+            font-size: clamp(1.35rem, 2.5vw, 1.8rem);
+            line-height: 1.15;
+        }
+        .demo-pill {
+            flex: 0 0 auto;
+            padding: .3rem .6rem;
+            color: #58658a;
+            background: #eef0f8;
+            border-radius: 999px;
+            font-size: .68rem;
+            font-weight: 700;
+            letter-spacing: .04em;
+        }
+        [data-testid="stForm"] {
+            padding: 1rem 1.2rem;
+            background: #ffffff;
+            border: 1px solid #e4e8f2;
+            border-radius: 15px;
+            box-shadow: 0 5px 18px rgba(36, 48, 90, .045);
+        }
+        [data-testid="stVerticalBlockBorderWrapper"] {
+            background: #ffffff;
+            border-color: #e4e8f2;
+            border-radius: 15px;
+            box-shadow: 0 5px 18px rgba(36, 48, 90, .045);
+        }
+        [data-testid="stMetric"] {
+            padding: .8rem .9rem;
+            background: #f8f9fc;
+            border: 1px solid #e4e8f2;
+            border-radius: 14px;
+        }
+        [data-testid="stMetricLabel"] p { color: #526078; }
+        [data-testid="stMetricValue"] { color: #202c47; }
+        [data-testid="stDataFrame"] { border-radius: 12px; }
+        div.stFormSubmitButton > button {
+            min-height: 2.9rem;
+            border-radius: 11px;
+            font-weight: 650;
+        }
+        @media (max-width: 700px) {
+            .block-container { padding: 1.25rem 1rem 2.5rem; }
+            .page-heading { align-items: flex-start; }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        """
+        <header class="page-heading">
+          <div>
+            <p>Smart Wallet · Rewards assistant</p>
+            <h1>Smart Wallet Rewards Optimizer</h1>
+          </div>
+          <span class="demo-pill">DEMO</span>
+        </header>
+        """,
+        unsafe_allow_html=True,
     )
 
-    entry, explainer = st.columns([1.35, 0.9], gap="large")
-    with entry:
-        st.markdown("#### Tell us about your purchase")
-        with st.form("transaction"):
+    with st.form("transaction"):
+        merchant_col, amount_col = st.columns([1.6, 1], gap="medium")
+        with merchant_col:
             merchant_name = st.text_input(
                 "Merchant",
                 value="Trader Joe's",
                 help="Enter a merchant from the catalog or a name for AI-assisted matching.",
             )
+        with amount_col:
             amount = st.number_input(
                 "Purchase amount",
                 min_value=0.01,
@@ -109,28 +195,19 @@ def main() -> None:
                 format="%.2f",
                 help="Amount in US dollars.",
             )
-            is_international = st.checkbox("This is an international purchase")
+        confirm_col, submit_col = st.columns([1.6, 1], gap="medium")
+        with confirm_col:
+            is_international = st.checkbox("International purchase")
+        with submit_col:
             submitted = st.form_submit_button(
-                "Find my best card  →",
+                "Find my best card →",
                 type="primary",
                 use_container_width=True,
             )
-
-    with explainer:
-        with st.container(border=True):
-            st.markdown("#### What you'll get")
-            st.markdown(
-                """
-                - **A card suggestion** based on your wallet
-                - **An estimated value** from rewards and applicable fees
-                - **A clear explanation** of the result
-                """
-            )
-            st.caption(f"Powered by {default_model_id()}")
-            st.caption(
-                "Demo with synthetic wallet data. Estimates are illustrative, "
-                "not financial advice."
-            )
+    st.caption(
+        f"Synthetic demo · Illustrative estimates, not financial advice · "
+        f"Model: {default_model_id()}"
+    )
 
     if submitted:
         try:
@@ -150,7 +227,7 @@ def main() -> None:
     response = st.session_state.get("evaluation_response")
     if response is not None:
         st.divider()
-        st.markdown("### Your recommendation")
+        st.markdown("### Recommendation")
         render_result(response)
 
 
