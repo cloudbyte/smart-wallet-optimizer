@@ -339,13 +339,13 @@ class TransactionAgentNodes:
         else:
             card = response.recommended_card
             response.assistant_message = (
-                f"The deterministic evaluator recommends {card.card_name} for "
-                f"{response.merchant_canonical_name} in the "
+                f"Based on the available information, {card.card_name} is the "
+                f"recommended card for {response.merchant_canonical_name} in the "
                 f"{response.primary_category} category."
                 if card
                 else (
-                    "The deterministic evaluator could not identify an eligible "
-                    "card for this transaction."
+                    "No eligible card recommendation is available for this "
+                    "transaction."
                 )
             )
             response.audit_trail.append(

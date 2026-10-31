@@ -348,8 +348,8 @@ def test_agent_replaces_unsupported_model_explanation():
     res = agent.evaluate_transaction(req)
 
     assert res.assistant_message == (
-        "The deterministic evaluator recommends American Express Gold Card for "
-        "Trader Joe's in the groceries category."
+        "Based on the available information, American Express Gold Card is the "
+        "recommended card for Trader Joe's in the groceries category."
     )
     assert any("Replaced the model explanation" in item for item in res.audit_trail)
 

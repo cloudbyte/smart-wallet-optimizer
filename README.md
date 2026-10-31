@@ -92,6 +92,16 @@ Enter a merchant, transaction amount, and whether the transaction is
 international. For example, merchants in the sample data include Trader Joe's,
 Walmart, Delta Air Lines, Shell, and The Capital Grille.
 
+To run the browser-based app locally instead:
+
+```bash
+PYTHONPATH=. streamlit run src/web_app.py
+```
+
+Streamlit opens the app at `http://localhost:8501`. It shares the same agent
+and evaluation logic as the command-line demo. The first recommendation loads
+the local Qwen model and may take a few minutes while model weights download.
+
 ## Recommendation Flow
 
 The official source URLs are maintained in
