@@ -1,10 +1,15 @@
+from pathlib import Path
+
 from streamlit.testing.v1 import AppTest
 
 from src.models import CardRecommendation, TransactionEvaluationResponse
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+WEB_APP_PATH = PROJECT_ROOT / "src" / "web_app.py"
+
 
 def test_streamlit_app_loads_form_without_loading_model():
-    app = AppTest.from_file("src/web_app.py").run()
+    app = AppTest.from_file(str(WEB_APP_PATH)).run()
 
     assert not app.exception
     assert any("Smart Wallet Rewards Optimizer" in item.value for item in app.markdown)
@@ -14,7 +19,7 @@ def test_streamlit_app_loads_form_without_loading_model():
 
 
 def test_streamlit_app_renders_structured_recommendation():
-    app = AppTest.from_file("src/web_app.py").run()
+    app = AppTest.from_file(str(WEB_APP_PATH)).run()
     app.session_state["evaluation_response"] = TransactionEvaluationResponse(
         merchant_canonical_name="Trader Joe's",
         mcc_code="5411",
