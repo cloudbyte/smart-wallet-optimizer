@@ -204,6 +204,28 @@ def test_walmart_confirmation_explains_merchant_is_known_but_category_varies():
     assert "may vary by department" in response.approval_reason
 
 
+def test_hilton_catalog_match_does_not_require_confirmation_for_travel_category(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "src.agent.nodes.resolve_location",
+        lambda _input: LocationContext(
+            venue_name="Unknown venue",
+            inferred_category="miscellaneous",
+            is_ambiguous=True,
+            confidence_score=0.0,
+        ),
+    )
+    response = make_agent().evaluate_transaction(
+        TransactionEvaluationRequest(merchant_name="Hilton", amount=100.0)
+    )
+
+    assert response.merchant_canonical_name == "Hilton"
+    assert response.primary_category == "travel"
+    assert response.requires_approval is False
+    assert response.approval_reason is None
+
+
 def test_wallet_retrieval():
     wallet = get_user_wallet("user_alex_01")
     assert wallet.user_id == "user_alex_01"

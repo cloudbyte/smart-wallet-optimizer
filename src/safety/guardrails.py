@@ -57,7 +57,7 @@ def approval_reason(
             f"{merchant.canonical_name}. We used the catalog category; please "
             "confirm it is appropriate."
         )
-    if (
+    if merchant is None and (
         location.confidence_score < LOCATION_CONFIDENCE_THRESHOLD
         or location.is_ambiguous
     ):

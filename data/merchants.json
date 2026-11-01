@@ -181,8 +181,7 @@
     "mcc_code": "7011",
     "primary_category": "travel",
     "qualifies_for_supermarket_multipliers": false,
-    "notes": "Hotel stay; property and booking channel can affect merchant coding",
-    "requires_confirmation": true
+    "notes": "Hotel stay; property and booking channel can affect merchant coding"
   },
   {
     "raw_merchant_name": "Hilton",
@@ -191,8 +190,7 @@
     "mcc_code": "7011",
     "primary_category": "travel",
     "qualifies_for_supermarket_multipliers": false,
-    "notes": "Hotel stay; property and booking channel can affect merchant coding",
-    "requires_confirmation": true
+    "notes": "Hotel stay; property and booking channel can affect merchant coding"
   },
   {
     "raw_merchant_name": "Uber",
