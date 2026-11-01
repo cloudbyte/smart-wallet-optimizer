@@ -51,11 +51,12 @@ confirm current eligibility and terms with the issuer.
 Open [`Smart_Wallet_Rewards_Optimizer_Colab.ipynb`](./Smart_Wallet_Rewards_Optimizer_Colab.ipynb) in Google Colab and run its cells
 from top to bottom. The setup cell clones a fresh copy of the GitHub project on
 every run, installs the dependencies, and runs the test suite. The final cell
-starts the Streamlit web app and opens it in a separate browser tab using
-Colab's port proxy. Keep the Colab runtime connected while using the app;
-stopping the runtime stops the web app as well. Re-running the clone cell removes the existing
-`smart-wallet-optimizer` directory at the notebook's current location before
-cloning again.
+starts the Streamlit web app and embeds it in the notebook using Colab's
+supported port proxy. Keeping it embedded avoids browser restrictions that can
+cause a 404 when opening the proxied app in a separate tab. Keep the Colab
+runtime connected while using the app; stopping the runtime stops the web app
+as well. Re-running the clone cell removes the existing `smart-wallet-optimizer`
+directory at the notebook's current location before cloning again.
 
 With a GPU runtime, the notebook selects Qwen3-4B from Hugging Face using
 4-bit quantization to reduce VRAM use. It also caps each prompt at 2,048 tokens
