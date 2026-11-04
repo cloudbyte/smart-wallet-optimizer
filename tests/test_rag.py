@@ -1,6 +1,11 @@
 import hashlib
+import tiktoken
 from src.rag.retriever import SmartWalletRAG
-from src.rag.ingestion import IssuerDocumentLoader, PASSAGE_CHARS
+from src.rag.ingestion import (
+    CHUNK_OVERLAP_TOKENS,
+    CHUNK_SIZE_TOKENS,
+    IssuerDocumentLoader,
+)
 
 
 def test_retriever_filters_by_card_and_returns_no_unverified_fallback():
@@ -136,10 +141,45 @@ def test_ingestion_splits_long_documents_into_passage_sized_chunks():
     )
 
     passages = IssuerDocumentLoader._split_passages(text)
+    encoding = tiktoken.get_encoding("cl100k_base")
+    tokenized = [encoding.encode(passage) for passage in passages]
+    overlaps = [
+        max(
+            (
+                len(encoding.encode(left[-overlap:]))
+                for overlap in range(min(len(left), len(right)), 0, -1)
+                if left[-overlap:] == right[:overlap]
+            ),
+            default=0,
+        )
+        for left, right in zip(passages, passages[1:])
+    ]
 
     assert len(passages) > 1
-    assert all(len(passage) <= PASSAGE_CHARS for passage in passages)
+    assert all(len(tokens) <= CHUNK_SIZE_TOKENS for tokens in tokenized)
+    assert all(overlap >= CHUNK_OVERLAP_TOKENS - 5 for overlap in overlaps)
     assert "Sentence number 0" in passages[0]
+
+
+def test_ingestion_classifies_required_vector_metadata_sections():
+    assert (
+        IssuerDocumentLoader._classify_section(
+            "Foreign transaction fees apply to this purchase."
+        )
+        == "fees"
+    )
+    assert (
+        IssuerDocumentLoader._classify_section(
+            "Trip delay reimbursement applies to eligible travel."
+        )
+        == "travel_insurance"
+    )
+    assert (
+        IssuerDocumentLoader._classify_section(
+            "Purchase protection covers eligible items against damage."
+        )
+        == "purchase_protection"
+    )
 
 
 def test_html_source_is_loaded_from_cache_and_passages_keep_source_metadata(tmp_path):
@@ -212,8 +252,43 @@ def test_local_embedding_cache_is_reused_between_retriever_instances(tmp_path):
         documents=documents,
         cache_dir=tmp_path,
     )
-    second.query_benefits("test_card", "query benefit")
+    evidence = second.query_benefits("test_card", "query benefit")
 
     assert first_call_count > 0
-    assert second_model.calls == 0
-    assert list(tmp_path.glob("embeddings-*.json"))
+    assert second_model.calls == 1
+    assert (tmp_path / "chroma").is_dir()
+    assert "Benefit text for search." in evidence
+
+
+def test_vector_store_persists_card_and_section_metadata(tmp_path):
+    class FakeEmbeddingModel:
+        embedding_model_id = "test/persisted-vector-model"
+
+        def embed(self, text):
+            return [1.0, 0.0] if "purchase" in text.casefold() else [0.0, 1.0]
+
+    documents = [
+        {
+            "card_id": "test_card",
+            "document_date": "2026-01-01",
+            "section": "purchase_protection",
+            "text": "Purchase protection covers eligible purchases.",
+            "title": "Test guide",
+            "url": "https://issuer.example.test/guide.pdf",
+            "page": 2,
+            "fetched_at": "2026-01-01",
+        }
+    ]
+    retriever = SmartWalletRAG(
+        embedder=FakeEmbeddingModel().embed,
+        documents=documents,
+        cache_dir=tmp_path,
+    )
+
+    evidence = retriever.query_benefits("test_card", "purchase protection")
+
+    assert "Purchase protection" in evidence
+    assert "page 2" in evidence
+    collection = retriever._get_collection()
+    stored = collection.get(where={"card_id": "test_card"}, include=["metadatas"])
+    assert stored["metadatas"][0]["section"] == "purchase_protection"

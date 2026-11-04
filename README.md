@@ -22,7 +22,8 @@ designed for local development and Google Colab.
   AI-matched names are flagged for human confirmation.
 - Loads a synthetic wallet and compares the reward yield of its eligible cards.
 - Downloads official card-benefit PDFs and issuer pages on demand, then retrieves
-  card-filtered passages with a purpose-trained MiniLM embedder and MMR.
+  card-filtered passages from a persistent local ChromaDB vector store using a
+  purpose-trained MiniLM embedder and MMR.
 - Evaluates card branches with deterministic financial calculations and an LLM
   critic that must cite retrieved text verbatim.
 - Accounts for foreign transaction fees and prunes cards where the fee is at
@@ -119,10 +120,12 @@ card. The agent then performs the full evaluation:
    multiplier, and mock point valuation.
 2. **Benefits:** Download and extract the issuer's PDF/HTML terms into local
    ignored cache, filter passages by card ID, and retrieve up to three relevant
-   passages with MiniLM embeddings and maximal marginal relevance (MMR). Returned
-   evidence is labeled with source URL, fetch time, and PDF page where available.
-   Configured perk estimates remain illustrative and are applied only when
-   retrieved text supports the benefit.
+   passages with MiniLM embeddings and maximal marginal relevance (MMR). Chunks
+   are 500 tokens with 50-token overlap and carry card, section, source, date,
+   and page metadata. ChromaDB persists the local index under
+   `.cache/card-benefits/chroma`. Returned evidence is labeled with source URL,
+   fetch time, and PDF page where available. Configured perk estimates remain
+   illustrative and are applied only when retrieved text supports the benefit.
 3. **Fees:** Subtract any international transaction fee and prune a branch when
    the fee equals or exceeds its reward yield.
 
@@ -145,9 +148,11 @@ hard pruning, and approval triggers remain deterministic.
 - [`data/benefit_sources.json`](./data/benefit_sources.json) lists official
   issuer document sources for cards in the sample wallet.
 - [`src/rag/ingestion.py`](./src/rag/ingestion.py) downloads and parses issuer
-  PDF/HTML terms; [`src/rag/retriever.py`](./src/rag/retriever.py) handles
-  embeddings, ranking, and citations. Downloaded documents remain local and
-  are excluded from version control.
+  PDF/HTML terms into overlapping token chunks; [`src/rag/retriever.py`](./src/rag/retriever.py)
+  indexes embeddings and metadata in a local persistent ChromaDB collection,
+  performs card-filtered vector search plus MMR reranking, and formats
+  citations. Downloaded documents and the index remain local and are excluded
+  from version control.
 - `purchase_protection_value_rate` and `extended_warranty_value_rate` in the
   wallet data are illustrative fractions of the transaction amount, not
   guarantees or actuarial valuations.

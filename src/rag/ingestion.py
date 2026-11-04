@@ -11,11 +11,14 @@ from urllib.parse import urlparse
 
 import requests
 from pypdf import PdfReader
+import tiktoken
 
 
 LOGGER = logging.getLogger(__name__)
 MAX_SOURCE_BYTES = 20 * 1024 * 1024
-PASSAGE_CHARS = 700
+CHUNK_SIZE_TOKENS = 500
+CHUNK_OVERLAP_TOKENS = 50
+SECTION_CATEGORIES = ("purchase_protection", "travel_insurance", "fees")
 
 
 class _VisibleTextParser(HTMLParser):
@@ -199,6 +202,7 @@ class IssuerDocumentLoader:
                 documents.append(
                     {
                         "card_id": source["card_id"],
+                        "section": self._classify_section(passage),
                         "title": source["title"],
                         "url": source["url"],
                         "format": source["format"],
@@ -215,30 +219,28 @@ class IssuerDocumentLoader:
         normalized = re.sub(r"\s+", " ", text).strip()
         if not normalized:
             return []
-
-        sentences = re.split(r"(?<=[.!?;])\s+", normalized)
-        passages: List[str] = []
-        current = ""
-        for sentence in sentences:
-            remaining = sentence.strip()
-            while remaining:
-                available = PASSAGE_CHARS - len(current) - (1 if current else 0)
-                if available <= 0:
-                    passages.append(current)
-                    current = ""
-                    available = PASSAGE_CHARS
-                if len(remaining) <= available:
-                    current = f"{current} {remaining}".strip()
-                    remaining = ""
-                else:
-                    split_at = remaining.rfind(" ", 0, available + 1)
-                    split_at = split_at if split_at > 0 else available
-                    part, remaining = remaining[:split_at].strip(), remaining[split_at:].strip()
-                    if current:
-                        passages.append(f"{current} {part}")
-                    else:
-                        passages.append(part)
-                    current = ""
-        if current:
-            passages.append(current)
+        encoding = tiktoken.get_encoding("cl100k_base")
+        tokens = encoding.encode(normalized)
+        stride = CHUNK_SIZE_TOKENS - CHUNK_OVERLAP_TOKENS
+        passages = [
+            encoding.decode(tokens[start : start + CHUNK_SIZE_TOKENS]).strip()
+            for start in range(0, len(tokens), stride)
+        ]
         return [passage for passage in passages if len(passage) >= 40]
+
+    @staticmethod
+    def _classify_section(text: str) -> str:
+        normalized = text.casefold()
+        if re.search(
+            r"\b(foreign transaction|annual fee|late fee|overdraft fee|"
+            r"fee schedule|transaction fee)\b",
+            normalized,
+        ):
+            return "fees"
+        if re.search(
+            r"\b(trip delay|trip cancellation|trip interruption|"
+            r"baggage delay|lost luggage|travel accident|rental car)\b",
+            normalized,
+        ):
+            return "travel_insurance"
+        return "purchase_protection"
