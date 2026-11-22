@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Wallet Rewards Optimizer — Capstone Presentation</title>
+    <style>
+        :root { color-scheme: light; --navy: #18344f; --blue: #2874a6; --ink: #25313b; --muted: #657583; --paper: #fff; --line: #d7e0e7; --pale: #eef5f9; --gold: #f0c66b; }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: Arial, sans-serif; color: var(--ink); background: #e7edf1; }
+        .slide { display: none; position: relative; width: min(100vw, 1440px); min-height: min(56.25vw, 810px); aspect-ratio: 16 / 9; margin: 2vh auto; padding: 5.3% 6.2% 5.6%; overflow: hidden; background: var(--paper); box-shadow: 0 8px 34px #243b5320; }
+        .slide.active { display: flex; flex-direction: column; }
+        .kicker { margin: 0 0 14px; color: var(--blue); font-size: clamp(12px, 1.1vw, 16px); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+        h1 { margin: 0 0 18px; color: var(--navy); font-size: clamp(34px, 4.3vw, 62px); line-height: 1.05; }
+        h2 { margin: 0 0 22px; color: var(--navy); font-size: clamp(28px, 3.2vw, 46px); line-height: 1.1; }
+        h3 { margin: 0 0 8px; color: var(--navy); font-size: clamp(18px, 1.65vw, 24px); }
+        p, li { font-size: clamp(16px, 1.48vw, 21px); line-height: 1.45; }
+        p { margin: 0 0 14px; }
+        ul { margin: 0; padding-left: 1.2em; }
+        li { margin: 0 0 10px; }
+        .subtitle { max-width: 760px; color: var(--muted); font-size: clamp(20px, 2vw, 29px); }
+        .meta { margin-top: 30px; color: var(--muted); font-size: clamp(14px, 1.3vw, 18px); }
+        .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 5%; align-items: start; }
+        .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+        .panel { padding: 17px 19px; border-left: 4px solid var(--blue); background: var(--pale); }
+        .panel.gold { border-color: #bd8413; background: #fff8e9; }
+        .panel.green { border-color: #45845c; background: #eff7f0; }
+        .stat { color: var(--navy); font-size: clamp(27px, 3.3vw, 46px); font-weight: 700; }
+        .small { color: var(--muted); font-size: clamp(13px, 1.1vw, 16px); }
+        .diagram { overflow: auto; padding: 14px; border: 1px solid var(--line); background: #fafcfd; }
+        .mermaid { min-width: 720px; text-align: center; }
+        .foot { position: absolute; right: 6.2%; bottom: 3%; left: 6.2%; display: flex; justify-content: space-between; color: #788692; font-size: 13px; }
+        .controls { position: fixed; right: 18px; bottom: 16px; z-index: 3; display: flex; gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid #cbd6de; border-radius: 8px; background: #fff; box-shadow: 0 2px 10px #0001; }
+        button { padding: 7px 12px; border: 1px solid #b9c9d5; border-radius: 5px; background: #fff; color: var(--navy); font-size: 14px; cursor: pointer; }
+        button:hover { background: var(--pale); }
+        #counter { min-width: 48px; color: var(--muted); text-align: center; font-size: 14px; }
+        a { color: var(--blue); }
+        @media (max-width: 760px) { .slide { width: 100vw; min-height: 100vh; aspect-ratio: auto; margin: 0; padding: 9vh 7vw 12vh; } .cols, .three { grid-template-columns: 1fr; gap: 18px; } .foot { bottom: 2%; } }
+        @media print { body { background: #fff; } .slide, .slide.active { display: flex !important; width: 100%; height: 100vh; margin: 0; box-shadow: none; break-after: page; } .controls { display: none; } }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: "default",
+            themeVariables: { fontSize: "18px" },
+            flowchart: { useMaxWidth: true, htmlLabels: true, nodeSpacing: 14, rankSpacing: 24, padding: 8 }
+        });
+    </script>
+</head>
+<body>
+    <main>
+        <section class="slide active">
+            <p class="kicker">Opening and project overview</p>
+            <h1>Smart Wallet<br>Rewards Optimizer</h1>
+            <p class="subtitle">A grounded, risk-aware assistant for comparing payment cards before a purchase.</p>
+            <p class="meta">Carnegie Mellon University Executive Education · Personal Assistant Track</p>
+            <div class="foot"><span>Decision support only · No payment execution</span><span>1 / 8</span></div>
+        </section>
+
+        <section class="slide">
+            <p class="kicker">Why this problem matters</p>
+            <h2>“Which card should I use?” is not just a multiplier lookup.</h2>
+            <div class="cols">
+                <div>
+                    <ul>
+                        <li>Rewards depend on merchant category and MCC edge cases.</li>
+                        <li>Foreign fees can erase an otherwise strong reward.</li>
+                        <li>Benefit terms are detailed, conditional, and change over time.</li>
+                        <li>One confident but wrong answer can mislead a financial choice.</li>
+                    </ul>
+                </div>
+                <div class="panel gold">
+                    <h3>Intended user</h3>
+                    <p>A rewards-aware consumer who wants a quick, auditable comparison of cards in a wallet.</p>
+                    <h3>System goal</h3>
+                    <p>Recommend and explain a card using synthetic wallet data, deterministic calculations, and retrieved evidence.</p>
+                </div>
+            </div>
+            <p class="small">An agent-based approach fits because the task coordinates merchant, wallet, and policy lookups with calculations; no single model response should be trusted to supply all of those facts.</p>
+            <div class="foot"><span>Scope: recommendation, not transaction authorization</span><span>2 / 8</span></div>
+        </section>
+
+        <section class="slide">
+            <p class="kicker">System architecture</p>
+            <h2>One graph, specialized responsibilities</h2>
+            <div class="diagram">
+                <pre class="mermaid">
+                flowchart TB
+                    U["User request<br/>merchant + amount + context"] --> V["Pydantic validation"]
+                    V --> G["LangGraph orchestration<br/>typed shared state"]
+                    G --> L["Location resolver"]
+                    G --> M["Merchant + MCC catalog"]
+                    G --> W["Synthetic wallet"]
+                    L --> C["Context & Rewards<br/>candidate cards + yield"]
+                    M --> C
+                    W --> C
+                    C --> B["Benefits & Risk"]
+                    D["Public issuer guides"] --> R["Local ChromaDB<br/>MiniLM + MMR"]
+                    R --> B
+                    B --> T["Decision Orchestrator<br/>breadth-first ToT + hard rules"]
+                    T --> S{"Approval needed?"}
+                    S -->|No| O["Ranked cards + rationale"]
+                    S -->|Yes| H["Human review"]
+                    H -->|corrected context| V
+                    O --> A["Structured result + audit"]
+                    Q["Qwen3<br/>bounded interpretation"] -. "catalog match / grounded text" .-> M
+                    Q -. "critique / explanation" .-> T
+                    style U fill:#e2e3e5,stroke:#41464b
+                    style V fill:#cfe2f3,stroke:#084298
+                    style G fill:#d1e7dd,stroke:#0f5132
+                    style L fill:#fff3cd,stroke:#856404
+                    style M fill:#fff3cd,stroke:#856404
+                    style W fill:#fff3cd,stroke:#856404
+                    style C fill:#d1e7dd,stroke:#0f5132
+                    style B fill:#f8d7da,stroke:#842029
+                    style D fill:#f4f4f4,stroke:#666
+                    style R fill:#f4f4f4,stroke:#666
+                    style T fill:#d1e7dd,stroke:#0f5132
+                    style S fill:#fff3cd,stroke:#856404
+                    style O fill:#cfe2f3,stroke:#084298
+                    style H fill:#f8d7da,stroke:#842029
+                    style A fill:#e2e3e5,stroke:#41464b
+                    style Q fill:#f4f4f4,stroke:#666,stroke-dasharray:5 5
+                </pre>
+            </div>
+            <p class="small">LangGraph coordinates typed state handoffs. Financial ranking and hard constraints remain deterministic.</p>
+            <div class="foot"><span>Major components work together through shared structured state</span><span>3 / 8</span></div>
+        </section>
+
+        <section class="slide">
+            <p class="kicker">System architecture · reasoning and memory</p>
+            <h2>Evaluate every viable card branch before ranking.</h2>
+            <div class="three">
+                <div class="panel"><h3>1 · Yield</h3><p>Category multiplier × point value × amount.</p></div>
+                <div class="panel"><h3>2 · Benefits</h3><p>Card-filtered issuer passages support—not invent—illustrative perks.</p></div>
+                <div class="panel"><h3>3 · Fees</h3><p>Subtract international fee; prune a branch when fee meets or exceeds yield.</p></div>
+            </div>
+            <p style="margin-top:24px"><strong>Example from a deterministic test:</strong> $100 at Trader Joe’s → Amex Gold earns 680¢ base rewards (4× × 1.7¢). Perk estimates are synthetic assumptions, not cash guarantees.</p>
+            <p class="small">RAG uses public issuer guides, local ChromaDB, MiniLM embeddings, card metadata, and MMR; source URLs and PDF page citations accompany retrieved text.</p>
+            <div class="foot"><span>Tree of Thought is a structured evaluation tree, not free-form model scoring</span><span>4 / 8</span></div>
+        </section>
+
+        <section class="slide">
+            <p class="kicker">Key design decisions</p>
+            <h2>Each refinement adds control where the task is uncertain.</h2>
+            <ul>
+                <li><strong>Problem framing:</strong> identified MCC ambiguity, changing terms, and arithmetic as reasons not to rely on prompting alone.</li>
+                <li><strong>Tools and memory:</strong> added merchant/wallet data tools and issuer-document retrieval.</li>
+                <li><strong>Reasoning and coordination:</strong> added breadth-first ToT branches and LangGraph roles with typed handoffs.</li>
+                <li><strong>Guardrails:</strong> validate <strong>0 &lt; amount ≤ $50,000</strong>; require review above <strong>$2,500</strong> or when merchant/category context is uncertain.</li>
+                <li><strong>Human control:</strong> users can confirm or correct context; stale evidence is withheld, failures are audited, and models cannot change scores or authorize purchases.</li>
+            </ul>
+            <div class="foot"><span>Autonomy is limited to grounded, lower-risk recommendations</span><span>5 / 8</span></div>
+        </section>
+
+        <section class="slide">
+            <p class="kicker">Evaluation and results</p>
+            <h2>What has been verified—and what has not</h2>
+            <div class="cols">
+                <div class="panel green">
+                    <div class="stat">72 / 72</div>
+                    <p>Automated tests passed on November 19, 2026.</p>
+                    <p class="small">Coverage includes tools, arithmetic, fees, ToT pruning, RAG citations, escalation, model fallback, and web review.</p>
+                </div>
+                <div>
+                    <h3>Evidence-based result</h3>
+                    <p>A synthetic $100 grocery test checks 680¢ base yield for Amex Gold using 4× and 1.7¢/point.</p>
+                    <h3>Not yet measured</h3>
+                    <p>No representative user benchmark, real-world accuracy, calibration, or latency distribution has been collected.</p>
+                </div>
+            </div>
+            <p class="small">Test pass rate is software verification—not proof of production accuracy. Future work: labeled holdout set, independent calculation oracle, reviewer burden, p50/p95 latency.</p>
+            <div class="foot"><span>Claims are limited to observed test results</span><span>6 / 8</span></div>
+        </section>
+
+        <section class="slide">
+            <p class="kicker">Repository and implementation</p>
+            <h2>Review the code, tests, and synthetic evaluation materials.</h2>
+            <div class="cols">
+                <div>
+                    <h3>Implementation</h3>
+                    <ul>
+                        <li>Python, Pydantic v2, and LangGraph orchestration.</li>
+                        <li>Streamlit interface and CLI over shared agent workflow.</li>
+                        <li>ChromaDB, MiniLM embeddings, and public issuer guides for RAG.</li>
+                        <li>Local Qwen3 model for bounded interpretation and language support.</li>
+                    </ul>
+                </div>
+                <div class="panel">
+                    <h3>Public GitHub repository</h3>
+                    <p><a href="https://github.com/cloudbyte/smart-wallet-optimizer">github.com/cloudbyte/smart-wallet-optimizer</a></p>
+                    <p class="small">README · source · synthetic data · tests · Colab notebook. Setup and usage instructions are in the README; downloaded issuer guides and the local vector index are not committed.</p>
+                </div>
+            </div>
+            <div class="foot"><span>Repository materials support technical review and reproducibility</span><span>7 / 8</span></div>
+        </section>
+
+        <section class="slide">
+            <p class="kicker">Closing reflection</p>
+            <h2>Useful autonomy depends on visible boundaries.</h2>
+            <div class="cols">
+                <div>
+                    <h3>What worked</h3>
+                    <p>Combining deterministic tools, retrieved evidence, structured reasoning, bounded model support, and selective review creates an auditable recommendation without granting payment authority.</p>
+                    <h3>What I learned</h3>
+                    <p>Good agent design is not just capability; it is deciding what the model cannot decide and making uncertainty actionable.</p>
+                </div>
+                <div class="panel gold">
+                    <h3>What I would improve next</h3>
+                    <p>Build a labeled merchant benchmark, measure calibration and reviewer burden, add item-level context, and profile latency and source freshness. Wallet and point values remain synthetic; perk estimates are illustrative, and no user study or real-world accuracy evaluation has been completed.</p>
+                    <p class="small">Any move toward real accounts or payment execution would need separate security, privacy, authorization, and compliance review.</p>
+                </div>
+            </div>
+            <p style="margin-top:20px">Questions?</p>
+            <div class="foot"><span>Educational demo · Not financial advice · No payment execution</span><span>8 / 8</span></div>
+        </section>
+    </main>
+    <nav class="controls" aria-label="Slide controls">
+        <button id="previous" type="button" aria-label="Previous slide">←</button>
+        <span id="counter">1 / 8</span>
+        <button id="next" type="button" aria-label="Next slide">→</button>
+        <button id="fullscreen" type="button">Full screen</button>
+    </nav>
+    <script>
+        const slides = Array.from(document.querySelectorAll(".slide"));
+        let current = 0;
+        function show(index) {
+            current = (index + slides.length) % slides.length;
+            slides.forEach((slide, i) => slide.classList.toggle("active", i === current));
+            document.getElementById("counter").textContent = `${current + 1} / ${slides.length}`;
+            history.replaceState(null, "", `#slide-${current + 1}`);
+        }
+        document.getElementById("previous").addEventListener("click", () => show(current - 1));
+        document.getElementById("next").addEventListener("click", () => show(current + 1));
+        document.getElementById("fullscreen").addEventListener("click", () => {
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+            else document.exitFullscreen();
+        });
+        document.addEventListener("keydown", event => {
+            if (["ArrowRight", " ", "PageDown"].includes(event.key)) show(current + 1);
+            if (["ArrowLeft", "PageUp"].includes(event.key)) show(current - 1);
+            if (event.key === "Home") show(0);
+            if (event.key === "End") show(slides.length - 1);
+        });
+        const start = Number(location.hash.replace("#slide-", "")) - 1;
+        if (Number.isInteger(start) && start >= 0 && start < slides.length) show(start);
+    </script>
+</body>
+</html>

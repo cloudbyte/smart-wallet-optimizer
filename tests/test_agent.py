@@ -163,6 +163,20 @@ def test_ai_merchant_match_rejects_uncertain_or_non_catalog_candidates(resolutio
     assert details.requires_confirmation
 
 
+def test_ai_merchant_resolver_failure_fails_closed(caplog):
+    def fail_resolution(_name, _candidates):
+        raise RuntimeError("model unavailable")
+
+    details = lookup_merchant(
+        MerchantLookupInput(raw_merchant_name="some grocery shop"),
+        fail_resolution,
+    )
+
+    assert details.resolution_method == "unresolved"
+    assert details.requires_confirmation
+    assert "AI merchant resolution failed" in caplog.text
+
+
 def test_ai_resolved_merchant_requires_human_confirmation_in_agent(monkeypatch):
     class MerchantResolverModel:
         def resolve_merchant(self, _merchant_name, _candidates):
@@ -237,9 +251,27 @@ def test_wallet_retrieval_rejects_unconfigured_user_id():
         get_user_wallet("another-user")
 
 
-def test_transaction_request_enforces_documented_amount_limit():
-    with pytest.raises(ValueError):
-        TransactionEvaluationRequest(merchant_name="Trader Joe's", amount=50_000.01)
+def test_agent_amount_guardrail_blocks_recommendation_before_graph_invocation(
+    monkeypatch,
+):
+    agent = make_agent()
+
+    def fail_if_invoked(*_args, **_kwargs):
+        raise AssertionError("guardrail must block before graph evaluation")
+
+    monkeypatch.setattr(agent.graph, "invoke", fail_if_invoked)
+    request = TransactionEvaluationRequest(
+        merchant_name="Trader Joe's",
+        amount=50_000.01,
+    )
+
+    response = agent.evaluate_transaction(request)
+
+    assert response.recommended_card is None
+    assert response.alternative_cards == []
+    assert response.blocked_reason is not None
+    assert "above the 50,000 USD limit" in response.blocked_reason
+    assert any("no recommendation was generated" in item for item in response.audit_trail)
 
 
 def test_transaction_request_rejects_empty_merchant_and_non_finite_amounts():
@@ -265,20 +297,18 @@ def test_cli_rejects_invalid_amount_without_starting_agent(monkeypatch, capsys):
     assert "Invalid amount" in capsys.readouterr().out
 
 
-def test_cli_rejects_amount_over_limit_without_starting_agent(monkeypatch, capsys):
+def test_cli_routes_over_limit_amount_through_agent_guardrail(monkeypatch, capsys):
     inputs = iter(["Trader Joe's", "50001", "n"])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     monkeypatch.setattr(
-        cli,
-        "SmartWalletAgent",
-        lambda **_kwargs: (_ for _ in ()).throw(
-            AssertionError("agent must not start for invalid input")
-        ),
+        cli, "Qwen3AgentModel", lambda: object()
     )
 
     cli.main()
 
-    assert "Invalid transaction" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "above the 50,000 USD limit" in output
+    assert "no recommendation was generated" in output
 
 def test_agent_evaluation_groceries():
     agent = make_agent()
@@ -292,6 +322,25 @@ def test_agent_evaluation_groceries():
         for item in res.audit_trail
     )
     assert all("deterministic evaluator" not in item.casefold() for item in res.audit_trail)
+
+
+def test_agent_reports_progress_for_completed_graph_stages():
+    agent = make_agent()
+    progress = []
+
+    response = agent.evaluate_transaction(
+        TransactionEvaluationRequest(merchant_name="Trader Joe's", amount=10.0),
+        progress_callback=progress.append,
+    )
+
+    assert response.recommended_card is not None
+    assert progress[0] == "Starting transaction evaluation..."
+    assert "Matching merchant and spending category..." in progress
+    assert "Loading wallet and eligible cards..." in progress
+    assert "Calculating card reward estimates..." in progress
+    assert "Comparing cards and applying safety checks..." in progress
+    assert progress[-1] == "Preparing the recommendation..."
+
 
 def test_agent_evaluation_travel():
     agent = make_agent()
@@ -392,18 +441,8 @@ def test_agent_replaces_unsupported_model_explanation():
     assert any("Replaced the model explanation" in item for item in res.audit_trail)
 
 
-def test_agent_uses_react_tool_selection_and_grounded_tot_critic():
-    class ReActModel:
-        def __init__(self):
-            self.actions = []
-            self.selected_actions = []
-
-        def choose_tool(self, context, available_actions):
-            self.actions.append((json.loads(context), list(available_actions)))
-            selected = available_actions[-1]
-            self.selected_actions.append(selected)
-            return selected
-
+def test_multi_agent_workflow_and_grounded_tot_critic():
+    class SpecialistModel:
         def critique_tree(self, facts):
             return (
                 "The American Express Gold Card is supported by retrieved text: "
@@ -413,32 +452,34 @@ def test_agent_uses_react_tool_selection_and_grounded_tot_critic():
         def explain(self, _facts):
             return "The American Express Gold Card matches this grocery purchase."
 
-    model = ReActModel()
+    model = SpecialistModel()
     agent = make_agent(explainer=model)
     req = TransactionEvaluationRequest(merchant_name="Trader Joe's", amount=100.0)
 
     res = agent.evaluate_transaction(req)
 
-    assert model.actions
-    assert all(
-        selected in available
-        for (_, available), selected in zip(model.actions, model.selected_actions)
+    assert any(
+        "Agent 1 (Context & Rewards Specialist)" in item for item in res.audit_trail
     )
-    assert len(model.actions) == 7
-    assert any("ReAct planner selected tool:" in item for item in res.audit_trail)
+    assert any(
+        "Agent 2 (Benefits & Risk Specialist)" in item for item in res.audit_trail
+    )
+    assert any(
+        "Agent 3 (Decision Orchestrator)" in item for item in res.audit_trail
+    )
+    assert any("calculated reward yields" in item for item in res.audit_trail)
     assert res.tree_assessment == (
         "The American Express Gold Card is supported by retrieved text: "
         "Purchase Protection covers eligible purchases."
     )
-    assert any("ToT critic produced an evidence-grounded assessment" in item
-               for item in res.audit_trail)
+    assert any(
+        "ToT critic produced an evidence-grounded assessment" in item
+        for item in res.audit_trail
+    )
 
 
 def test_agent_rejects_critic_evidence_from_another_card_branch():
     class CrossCardCritic:
-        def choose_tool(self, _context, available_actions):
-            return available_actions[0]
-
         def critique_tree(self, _facts):
             return (
                 "The American Express Gold Card is supported by retrieved text: "
@@ -538,6 +579,41 @@ def test_agent_includes_mock_perk_estimate_in_tree():
         if node.depth == 2 and node.card_id == "amex_gold"
     )
     assert amex_perk_node.perk_value_cents == 200.0
+
+
+def test_benefit_retrieval_failure_withholds_perks_and_requires_review(caplog):
+    class FailingBenefits:
+        def query_benefits(self, _card_id, _query):
+            raise RuntimeError("issuer service unavailable")
+
+    response = SmartWalletAgent(rag=FailingBenefits()).evaluate_transaction(
+        TransactionEvaluationRequest(merchant_name="Trader Joe's", amount=100.0)
+    )
+
+    assert response.recommended_card is not None
+    assert response.requires_approval
+    assert "benefit evidence could not be retrieved" in response.approval_reason
+    assert any("benefit claims are withheld" in item for item in response.audit_trail)
+    assert "Benefit retrieval failed" in caplog.text
+
+
+def test_optional_model_failures_use_safe_fallback_and_record_latency():
+    class FailingModel:
+        def critique_tree(self, _facts):
+            raise RuntimeError("critic unavailable")
+
+        def explain(self, _facts):
+            raise RuntimeError("explainer unavailable")
+
+    response = make_agent(explainer=FailingModel()).evaluate_transaction(
+        TransactionEvaluationRequest(merchant_name="Trader Joe's", amount=100.0)
+    )
+
+    assert response.assistant_message is not None
+    assert response.assistant_message.startswith("Based on the available information")
+    assert any("ToT critic failed" in item for item in response.audit_trail)
+    assert any("Model explanation failed" in item for item in response.audit_trail)
+    assert any("End-to-end evaluation latency:" in item for item in response.audit_trail)
 
 
 def test_rag_citation_title_alone_does_not_count_as_benefit_evidence():

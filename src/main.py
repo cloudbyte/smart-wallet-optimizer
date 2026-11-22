@@ -10,7 +10,7 @@ def main():
     try:
         amount = float(input("Enter transaction amount ($): ").strip() or "75.50")
     except ValueError:
-        print("Invalid amount: enter a positive number no greater than $50,000.")
+        print("Invalid amount: enter a positive number.")
         return
         
     is_intl_input = input("Is this an international transaction? (y/N): ").strip().lower()
@@ -31,6 +31,11 @@ def main():
     res = agent.evaluate_transaction(req)
 
     print("\n--- EVALUATION RESULTS ---")
+    if res.blocked_reason:
+        print(f"\n⛔ {res.blocked_reason}")
+        for step in res.audit_trail:
+            print(f"   • {step}")
+        return
     if res.assistant_message:
         print(f"\n🤖 AI-generated summary (informational): {res.assistant_message}")
     if res.tree_assessment:

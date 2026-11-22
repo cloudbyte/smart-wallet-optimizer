@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Callable, List, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 from src.models import (
     CardRecommendation,
@@ -34,6 +34,45 @@ def _point_valuation_key(card: CreditCardProfile) -> str:
     if "citi" in card.card_id:
         return "citi_ty"
     return "cash"
+
+
+def _reward_components(
+    card: CreditCardProfile,
+    wallet: UserWallet,
+    request: TransactionEvaluationRequest,
+    category: str,
+    qualifies_for_supermarket_multipliers: bool,
+) -> Tuple[float, str, float, float]:
+    multiplier = card.base_multipliers.get(
+        category, card.base_multipliers.get("default", 1.0)
+    )
+    if category == "groceries" and not qualifies_for_supermarket_multipliers:
+        multiplier = card.base_multipliers.get("default", 1.0)
+
+    valuation_key = _point_valuation_key(card)
+    point_value_cents = wallet.point_valuation_cents.get(valuation_key, 1.0)
+    expected_yield_cents = request.amount * multiplier * point_value_cents
+    return multiplier, valuation_key, point_value_cents, expected_yield_cents
+
+
+def calculate_reward_yields(
+    request: TransactionEvaluationRequest,
+    wallet: UserWallet,
+    category: str,
+    qualifies_for_supermarket_multipliers: bool,
+) -> Dict[str, float]:
+    """Calculate deterministic reward yields for active wallet cards."""
+    return {
+        card.card_id: _reward_components(
+            card,
+            wallet,
+            request,
+            category,
+            qualifies_for_supermarket_multipliers,
+        )[3]
+        for card in wallet.cards
+        if not card.is_frozen and not card.is_expired
+    }
 
 
 def _evidence_contains_benefit(evidence: str, benefit_name: str) -> bool:
@@ -89,6 +128,8 @@ def evaluate_wallet_tree(
     category: str,
     qualifies_for_supermarket_multipliers: bool,
     query_benefits: Callable[[str, str], str],
+    reward_yields_cents: Optional[Dict[str, float]] = None,
+    foreign_transaction_fees: Optional[Dict[str, float]] = None,
 ) -> Tuple[List[CardRecommendation], List[ThoughtNode], List[str]]:
     """Evaluate every wallet branch breadth-first across yield, perks, and fees."""
     audit: List[str] = []
@@ -108,19 +149,29 @@ def evaluate_wallet_tree(
             audit.append(f"Pruned {card.card_name}: card is frozen or expired.")
             continue
 
-        multiplier = card.base_multipliers.get(
-            category, card.base_multipliers.get("default", 1.0)
+        (
+            multiplier,
+            valuation_key,
+            point_value_cents,
+            calculated_yield_cents,
+        ) = _reward_components(
+            card,
+            wallet,
+            request,
+            category,
+            qualifies_for_supermarket_multipliers,
         )
         if category == "groceries" and not qualifies_for_supermarket_multipliers:
-            multiplier = card.base_multipliers.get("default", 1.0)
             audit.append(
                 f"Card {card.card_name}: Supermarket exclusion applies; "
                 f"fallback to {multiplier}x."
             )
 
-        valuation_key = _point_valuation_key(card)
-        point_value_cents = wallet.point_valuation_cents.get(valuation_key, 1.0)
-        expected_yield_cents = request.amount * multiplier * point_value_cents
+        expected_yield_cents = (
+            reward_yields_cents.get(card.card_id, calculated_yield_cents)
+            if reward_yields_cents is not None
+            else calculated_yield_cents
+        )
         branches.append(
             _CardBranch(
                 card=card,
@@ -203,7 +254,14 @@ def evaluate_wallet_tree(
     for branch in branches:
         card = branch.card
         fee = (
-            request.amount * card.foreign_transaction_fee
+            request.amount
+            * (
+                foreign_transaction_fees.get(
+                    card.card_id, card.foreign_transaction_fee
+                )
+                if foreign_transaction_fees is not None
+                else card.foreign_transaction_fee
+            )
             if request.is_international
             else 0.0
         )

@@ -52,7 +52,14 @@ def lookup_merchant(
                 )
             )
         )
-        match = resolver(input_data.raw_merchant_name, catalog_names)
+        try:
+            match = resolver(input_data.raw_merchant_name, catalog_names)
+        except (OSError, RuntimeError, ValueError) as error:
+            LOGGER.warning(
+                "AI merchant resolution failed (%s); requiring confirmation.",
+                type(error).__name__,
+            )
+            match = None
         if (
             match is not None
             and match.canonical_name is not None

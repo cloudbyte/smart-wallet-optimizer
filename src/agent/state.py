@@ -1,9 +1,13 @@
-from typing import Dict, List, Optional, Protocol, TypedDict
+from typing import List, Optional, Protocol, TypedDict
 
 from src.models import (
+    BenefitsRiskAssessment,
+    CardRecommendation,
+    ContextRewardsAssessment,
     LocationContext,
     MerchantDetails,
     MerchantResolution,
+    ThoughtNode,
     TransactionEvaluationRequest,
     TransactionEvaluationResponse,
     UserWallet,
@@ -12,8 +16,6 @@ from src.models import (
 
 class AgentLanguageModel(Protocol):
     def explain(self, facts: str) -> str: ...
-
-    def choose_tool(self, context: str, available_actions: List[str]) -> Optional[str]: ...
 
     def resolve_merchant(
         self, merchant_name: str, candidates: List[str]
@@ -26,12 +28,18 @@ class AgentLanguageModel(Protocol):
 
 class AgentState(TypedDict, total=False):
     request: TransactionEvaluationRequest
-    phase: str
-    pending_actions: List[str]
-    next_action: str
     location_context: LocationContext
+    location_audit: str
     merchant: MerchantDetails
+    merchant_audit: str
     wallet: UserWallet
-    benefit_evidence: Dict[str, str]
+    wallet_audit: str
+    context_assessment: ContextRewardsAssessment
+    benefits_assessment: BenefitsRiskAssessment
+    candidate_cards: List[str]
+    reasoning_tree: List[ThoughtNode]
+    recommended_card: Optional[CardRecommendation]
+    tree_assessment: Optional[str]
+    assistant_message: Optional[str]
     audit_trail: List[str]
     response: TransactionEvaluationResponse

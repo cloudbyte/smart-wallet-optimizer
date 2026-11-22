@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Wallet Rewards Optimizer — Final Capstone Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.55; max-width: 820px; margin: 36px auto; padding: 28px; color: #252525; }
+        h1, h2 { color: #263f59; }
+        h1 { font-size: 25px; margin-bottom: 4px; }
+        h2 { font-size: 17px; margin: 22px 0 7px; }
+        p { margin: 7px 0 10px; }
+        ul { margin: 6px 0 10px; padding-left: 23px; }
+        li { margin-bottom: 4px; }
+        .subtitle { color: #526579; margin-top: 0; }
+        .note { border-left: 4px solid #3498db; background: #e8f4f8; padding: 10px 14px; margin: 14px 0; }
+        .repo { overflow-wrap: anywhere; }
+        .diagram-container { background-color: #f4f4f4; padding: 8px; border-radius: 8px; margin: 14px 0; text-align: center; overflow-x: auto; }
+        .diagram-container svg { display: block; width: 100%; height: auto; }
+        @media print { body { margin: 0; padding: 12mm; max-width: none; } .diagram-container { break-before: page; break-inside: avoid; } }
+    </style>
+</head>
+<body>
+    <h1>Smart Wallet Rewards Optimizer</h1>
+    <p class="subtitle">Final Capstone Report · Carnegie Mellon University Executive Education: Agentic AI · Personal Assistant Track</p>
+
+    <h2>1. Project title</h2>
+    <p>Smart Wallet Rewards Optimizer: A Grounded, Risk-Aware Payment Card Recommendation Agent.</p>
+
+    <h2>2. Problem and user</h2>
+    <p>Consumers with multiple rewards cards face scattered multipliers, merchant-category-code (MCC) exceptions, foreign transaction fees, and detailed benefit terms. A card with the highest headline multiplier may not produce the highest net value after fees, and a benefit should not be assumed merely because a model remembers it. The intended user is an everyday, rewards-aware cardholder who wants a concise, auditable comparison before paying.</p>
+
+    <h2>3. System goal and scope</h2>
+    <p>Given a merchant, amount, and international-purchase flag, the system identifies the catalog category, loads a synthetic wallet, calculates rewards, retrieves relevant card-specific evidence, compares cards, and returns a recommendation with alternatives and an audit trail. It is decision support only: no live accounts, real customer profiles, balances, payment execution, or personalized financial advice. Wallet values and perk estimates are illustrative; users must verify current issuer terms.</p>
+    <p>Success means producing a valid, explainable comparison whose calculations follow the configured wallet data, whose benefit claims cite retrieved card-specific evidence, and whose uncertain or higher-impact cases are routed for confirmation. Passing tests demonstrates behavior on specified cases, not real-world accuracy.</p>
+
+    <h2>4. Final system architecture</h2>
+    <p>A Pydantic v2 request model validates transaction inputs. A LangGraph state graph then coordinates parallel location, merchant-catalog, and wallet lookups, followed by three specialist stages:</p>
+    <ul>
+        <li><strong>Context and Rewards:</strong> resolves canonical merchant/MCC/category and calculates candidate-card yields from synthetic JSON data.</li>
+        <li><strong>Benefits and Risk:</strong> retrieves card-filtered issuer passages from a local ChromaDB index when the purchase is not a low-value, local, non-high-risk case. The pipeline parses public PDF/HTML guides, records source metadata, and uses MiniLM embeddings with maximal marginal relevance (MMR).</li>
+        <li><strong>Decision Orchestrator:</strong> evaluates card branches breadth-first using deterministic reward, supported illustrative perk, and fee values. It prunes frozen/expired cards and branches whose international fee meets or exceeds reward yield, applies approval rules, and assembles a structured result.</li>
+    </ul>
+    <p>Local Qwen3 can map an uncertain merchant to a catalog candidate, critique the reasoning tree, and explain results. It cannot invent MCC data, change scores, or override constraints. Critiques must cite retrieved evidence; unsupported summaries are replaced by factual fallbacks. Streamlit and CLI share the workflow.</p>
+    <div class="diagram-container">
+        <svg viewBox="0 0 760 610" role="img" aria-labelledby="architecture-title architecture-desc" xmlns="http://www.w3.org/2000/svg">
+            <title id="architecture-title">Smart Wallet Rewards Optimizer high-level architecture</title>
+            <desc id="architecture-desc">User request flows through validation and LangGraph orchestration. Location, merchant, and wallet tools feed context and rewards. Public issuer documents are retrieved through local ChromaDB and MMR. The decision orchestrator evaluates Tree-of-Thought branches and routes uncertain cases to human review before returning a ranked recommendation and audit trail. Qwen provides bounded interpretation and grounded language support.</desc>
+            <defs>
+                <marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+                    <path d="M0,0 L10,4 L0,8 z" fill="#666"/>
+                </marker>
+                <marker id="dash-arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+                    <path d="M0,0 L10,4 L0,8 z" fill="#888"/>
+                </marker>
+                <style>
+                    .edge { fill: none; stroke: #666; stroke-width: 2; marker-end: url(#arrow); }
+                    .support { fill: none; stroke: #888; stroke-width: 2; stroke-dasharray: 6 5; marker-end: url(#dash-arrow); }
+                    .node { stroke-width: 2; rx: 8; }
+                    .label { font: 16px Arial, sans-serif; fill: #263238; text-anchor: middle; }
+                    .small-label { font: 13px Arial, sans-serif; fill: #52606d; text-anchor: middle; }
+                    .blue { fill: #cfe2f3; stroke: #084298; }
+                    .green { fill: #d1e7dd; stroke: #0f5132; }
+                    .yellow { fill: #fff3cd; stroke: #856404; }
+                    .red { fill: #f8d7da; stroke: #842029; }
+                    .gray { fill: #f4f4f4; stroke: #666; }
+                </style>
+            </defs>
+            <rect class="node gray" x="250" y="12" width="260" height="48"/>
+            <text class="label" x="380" y="42">User request</text>
+            <path class="edge" d="M380 60 V78"/>
+            <rect class="node blue" x="250" y="82" width="260" height="54"/>
+            <text class="label" x="380" y="105">CLI / Streamlit + validation</text>
+            <text class="small-label" x="380" y="125">typed merchant and amount</text>
+            <path class="edge" d="M380 136 V154"/>
+            <rect class="node green" x="250" y="158" width="260" height="52"/>
+            <text class="label" x="380" y="190">LangGraph orchestration</text>
+            <path class="edge" d="M380 210 V226 H132 V240"/>
+            <path class="edge" d="M380 226 V240"/>
+            <path class="edge" d="M380 226 H628 V240"/>
+            <rect class="node yellow" x="32" y="244" width="200" height="58"/>
+            <text class="label" x="132" y="270">Location resolver</text>
+            <text class="small-label" x="132" y="289">venue context</text>
+            <rect class="node yellow" x="280" y="244" width="200" height="58"/>
+            <text class="label" x="380" y="270">Merchant catalog</text>
+            <text class="small-label" x="380" y="289">canonical name + MCC</text>
+            <rect class="node yellow" x="528" y="244" width="200" height="58"/>
+            <text class="label" x="628" y="270">Synthetic wallet</text>
+            <text class="small-label" x="628" y="289">cards + point values</text>
+            <path class="edge" d="M132 302 V324 H380 V338"/>
+            <path class="edge" d="M380 302 V338"/>
+            <path class="edge" d="M628 302 V324 H380"/>
+            <rect class="node green" x="250" y="342" width="260" height="58"/>
+            <text class="label" x="380" y="368">Context &amp; Rewards</text>
+            <text class="small-label" x="380" y="388">candidate cards + deterministic yield</text>
+            <path class="edge" d="M380 400 V416"/>
+            <rect class="node red" x="250" y="420" width="260" height="54"/>
+            <text class="label" x="380" y="443">Benefits &amp; Risk</text>
+            <text class="small-label" x="380" y="463">card-filtered policy evidence</text>
+            <rect class="node gray" x="12" y="420" width="204" height="54"/>
+            <text class="label" x="114" y="443">Issuer guides → RAG</text>
+            <text class="small-label" x="114" y="463">ChromaDB · MiniLM · MMR</text>
+            <path class="edge" d="M216 447 H246"/>
+            <path class="edge" d="M380 474 V488"/>
+            <rect class="node green" x="250" y="492" width="260" height="54"/>
+            <text class="label" x="380" y="515">Decision Orchestrator</text>
+            <text class="small-label" x="380" y="535">ToT branches + hard constraints</text>
+            <path class="edge" d="M380 546 V558"/>
+            <rect class="node blue" x="250" y="562" width="260" height="40"/>
+            <text class="label" x="380" y="587">Ranked result + audit trail</text>
+            <rect class="node red" x="548" y="492" width="180" height="54"/>
+            <text class="label" x="638" y="515">Human review</text>
+            <text class="small-label" x="638" y="535">confirm / correct</text>
+            <path class="edge" d="M510 519 H544"/>
+            <path class="support" d="M638 492 V109 H514"/>
+            <rect class="node gray" x="12" y="492" width="204" height="54"/>
+            <text class="label" x="114" y="515">Qwen3 model</text>
+            <text class="small-label" x="114" y="535">bounded language support</text>
+            <path class="support" d="M216 509 H244"/>
+        </svg>
+    </div>
+
+    <h2>5. Design evolution across the program</h2>
+    <p>The project evolved from a problem and tool-scoping proposal into an integrated, testable system. Early design work identified why a standalone language model was not sufficient: it lacks wallet state, can confuse merchant categories, and is unreliable at financial arithmetic and policy interpretation. Tool and memory design then added a synthetic merchant catalog, wallet access, and retrieval over public issuer guides. The ToT checkpoint made the comparison explicit: each active card is a branch evaluated for reward yield, supported benefits, and fee impact, rather than committing to the highest multiplier immediately.</p>
+    <p>Multi-agent design separated context/rewards, benefits/risk, and decision orchestration through LangGraph state. Safety work added input bounds, grounded-output checks, escalation, failure fallbacks, and a review form. The final architecture keeps computation deterministic and model contributions constrained.</p>
+
+    <h2>6. Implementation overview</h2>
+    <p>The codebase uses Python, Pydantic v2, LangGraph, Streamlit, ChromaDB, Requests, PyPDF, and Transformers. Qwen3-0.6B is the local CPU default; the Colab notebook selects Qwen3-4B for GPU execution. Sentence Transformers' all-MiniLM-L6-v2 provides embeddings. Synthetic merchant and wallet profiles live in JSON. Public issuer URLs are listed in a source manifest; downloaded terms and vector indexes are cached locally and are not committed. The README documents local and Colab setup, CLI/web usage, data, and recommendation flow.</p>
+
+    <h2>7. Evaluation and results</h2>
+    <p>The automated suite tests input validation, catalog resolution and aliases, wallet constraints, arithmetic, ToT ordering and pruning, international fees, benefit evidence and citations, approval routing, output grounding, retrieval behavior, model fallbacks, and web rendering/review. On November 19, 2026, the full suite collected and passed <strong>72 of 72 tests</strong> in the project virtual environment. For example, a deterministic synthetic Trader Joe’s grocery case checks that the American Express Gold Card earns 680 cents in base rewards on a $100 purchase using the configured 4× multiplier and 1.7-cent point valuation. Separate tests check fee conversion, evidence-dependent perk estimates, and required confirmation for uncertain cases.</p>
+    <p>These results verify specified software behavior, not real-world accuracy. No user study, holdout benchmark, calibration study, or production latency analysis has been run. Although the audit records end-to-end latency, no representative distribution exists. Next evaluation should use labeled merchants, an independent calculation oracle, injected service failures, reviewer agreement and false-escalation measures, and p50/p95 latency. Targets must remain distinct from observed results.</p>
+
+    <h2>8. Safety and reliability considerations</h2>
+    <p>Requests require a non-empty merchant and a finite amount above zero and no greater than $50,000. Unknown merchants use a conservative miscellaneous category and require confirmation. AI-matched, category-ambiguous, low-confidence, conflicting-category, high-value (over $2,500), no-eligible-card, and benefit-retrieval-failure cases are flagged for user review. Model explanations and critiques cannot change structured financial results; optional model failures are logged and explanations fall back to verified summaries. If an expired issuer document cannot be refreshed, it is withheld rather than used as current evidence. The Streamlit review form lets the user confirm context or correct merchant/category and re-evaluate; it records review information in the response audit but does not persist corrections or change system rules automatically.</p>
+    <p>Audit entries capture tool outcomes, citations, branch scores, pruning/escalation reasons, failures, review corrections, and latency. Tests use synthetic data; the system has no payment authority. These safeguards cannot prove public documents are complete or current, and user confirmation is not issuer verification.</p>
+
+    <h2>9. Limitations and next steps</h2>
+    <p>Wallet profiles and point values are mock data; benefit values are illustrative, not actuarial. Item-level exclusions, purchase details, rotating categories, balances, and welcome-bonus progress are not fully represented. Merchant categories may differ by department or processor. Source availability and parsing affect reliability; a small local model may make weak matches. Human review is an interactive confirmation, not a staffed queue, and corrections do not drive continuous learning.</p>
+    <p>Next steps are to replace illustrative perk values with transparent, user-configurable assumptions; add item and receipt context; improve source freshness and coverage tests; collect a blinded benchmark and latency profile; measure calibration and reviewer burden; and add durable, privacy-conscious review telemetry. Any expansion toward account connections or payment execution would require a separate security, privacy, authorization, and compliance review.</p>
+
+    <h2>10. Public GitHub repository</h2>
+    <p class="repo">Public project repository: <a href="https://github.com/cloudbyte/smart-wallet-optimizer">https://github.com/cloudbyte/smart-wallet-optimizer</a></p>
+    <p>The repository includes the README, source modules, synthetic data, tests, and Colab notebook with setup instructions. Benefit-guide downloads and the local vector index are excluded from version control.</p>
+
+    <div class="note"><strong>Educational disclaimer:</strong> This prototype uses synthetic wallet data and illustrative benefit estimates. It is not financial advice and should not be used to make real payment decisions.</div>
+</body>
+</html>

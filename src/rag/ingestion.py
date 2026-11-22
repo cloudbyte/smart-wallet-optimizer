@@ -154,13 +154,14 @@ class IssuerDocumentLoader:
         except requests.RequestException as error:
             if cache_path.exists():
                 LOGGER.warning(
-                    "Could not refresh issuer source %s; using the cached copy: %s",
+                    "Could not refresh issuer source %s; withholding the stale "
+                    "cached copy: %s",
                     url,
                     error,
                 )
-                return cache_path, datetime.fromtimestamp(
-                    cache_path.stat().st_mtime, timezone.utc
-                ).isoformat()
+                raise RuntimeError(
+                    f"Could not refresh expired issuer terms from {url}."
+                ) from error
             raise RuntimeError(f"Could not download issuer terms from {url}: {error}") from error
 
     def _extract_chunks(

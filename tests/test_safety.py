@@ -4,7 +4,33 @@ from src.models import (
     TransactionEvaluationRequest,
     TransactionEvaluationResponse,
 )
-from src.safety.guardrails import approval_reason, is_grounded_summary
+from src.safety.guardrails import (
+    MAX_TRANSACTION_AMOUNT_USD,
+    approval_reason,
+    is_grounded_summary,
+    transaction_block_reason,
+)
+
+
+def test_amount_guardrail_blocks_only_amounts_above_maximum():
+    assert (
+        transaction_block_reason(
+            TransactionEvaluationRequest(
+                merchant_name="Trader Joe's",
+                amount=MAX_TRANSACTION_AMOUNT_USD,
+            )
+        )
+        is None
+    )
+    reason = transaction_block_reason(
+        TransactionEvaluationRequest(
+            merchant_name="Trader Joe's",
+            amount=MAX_TRANSACTION_AMOUNT_USD + 0.01,
+        )
+    )
+
+    assert reason is not None
+    assert "above the 50,000 USD limit" in reason
 
 
 def test_missing_recommendation_requires_approval_even_for_high_value_transaction():
@@ -20,6 +46,25 @@ def test_missing_recommendation_requires_approval_even_for_high_value_transactio
     )
 
     assert reason == "No eligible wallet card remains after ToT constraint evaluation."
+
+
+def test_high_value_approval_message_uses_readable_currency_without_markdown_math():
+    reason = approval_reason(
+        TransactionEvaluationRequest(merchant_name="Trader Joe's", amount=3000.0),
+        LocationContext(
+            venue_name="Trader Joe's",
+            inferred_category="groceries",
+            is_ambiguous=False,
+            confidence_score=1.0,
+        ),
+        has_recommendations=True,
+    )
+
+    assert reason == (
+        "Transaction amount 3,000.00 USD exceeds the high-value threshold of "
+        "2,500 USD. Please confirm before relying on this recommendation."
+    )
+    assert "$" not in reason
 
 
 def test_unresolved_merchant_confirmation_explains_what_user_should_check():
@@ -95,6 +140,53 @@ def test_ai_match_confirmation_names_suggested_merchant():
     assert "matched" in reason
     assert "Trader Joe's" in reason
     assert "confirm this is the correct merchant" in reason
+
+
+def test_low_confidence_merchant_requires_confirmation():
+    reason = approval_reason(
+        TransactionEvaluationRequest(merchant_name="Sample Shop", amount=100.0),
+        LocationContext(
+            venue_name="Sample Shop",
+            inferred_category="dining",
+            is_ambiguous=False,
+            confidence_score=0.95,
+        ),
+        has_recommendations=True,
+        merchant=MerchantDetails(
+            canonical_name="Sample Shop",
+            mcc_code="5812",
+            primary_category="dining",
+            qualifies_for_supermarket_multipliers=False,
+            match_confidence=0.60,
+        ),
+    )
+
+    assert reason is not None
+    assert "confidence" in reason
+    assert "confirm" in reason
+
+
+def test_benefit_retrieval_failure_requires_confirmation():
+    reason = approval_reason(
+        TransactionEvaluationRequest(merchant_name="Trader Joe's", amount=100.0),
+        LocationContext(
+            venue_name="Trader Joe's",
+            inferred_category="groceries",
+            is_ambiguous=False,
+            confidence_score=1.0,
+        ),
+        has_recommendations=True,
+        merchant=MerchantDetails(
+            canonical_name="Trader Joe's",
+            mcc_code="5411",
+            primary_category="groceries",
+            qualifies_for_supermarket_multipliers=True,
+        ),
+        benefit_retrieval_failed=True,
+    )
+
+    assert reason is not None
+    assert "could not be retrieved" in reason
 
 
 def test_summary_grounding_rejects_unverified_numeric_claims():

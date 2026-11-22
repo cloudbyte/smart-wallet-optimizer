@@ -1,4 +1,9 @@
 import hashlib
+import os
+import time
+
+import pytest
+import requests
 import tiktoken
 from src.rag.retriever import SmartWalletRAG
 from src.rag.ingestion import (
@@ -210,6 +215,54 @@ def test_html_source_is_loaded_from_cache_and_passages_keep_source_metadata(tmp_
     assert documents[0]["card_id"] == "test_card"
     assert documents[0]["url"] == source_url
     assert "Coverage applies" in documents[0]["text"]
+
+
+def test_expired_issuer_cache_is_not_used_when_refresh_fails(tmp_path, monkeypatch):
+    source_url = "https://issuer.example.test/benefits"
+    source = {
+        "card_id": "test_card",
+        "title": "Test issuer benefits",
+        "url": source_url,
+        "allowed_hosts": ["issuer.example.test"],
+        "format": "html",
+    }
+    cache_file = tmp_path / (
+        hashlib.sha256(source_url.encode()).hexdigest() + ".html"
+    )
+    cache_file.write_text("<html>outdated terms</html>", encoding="utf-8")
+    old_time = time.time() - 3600
+    os.utime(cache_file, (old_time, old_time))
+    loader = IssuerDocumentLoader(
+        sources=[source],
+        cache_dir=tmp_path,
+        cache_ttl_seconds=1,
+    )
+
+    def fail_request(*_args, **_kwargs):
+        raise requests.ConnectionError("network unavailable")
+
+    monkeypatch.setattr("src.rag.ingestion.requests.get", fail_request)
+
+    with pytest.raises(RuntimeError, match="expired issuer terms"):
+        loader.load_card_documents("test_card")
+
+
+def test_retriever_refreshes_a_card_after_its_document_ttl():
+    retriever = SmartWalletRAG(sources=[], cache_ttl_seconds=1)
+    calls = 0
+
+    def load_documents(card_id):
+        nonlocal calls
+        calls += 1
+        return [{"card_id": card_id, "text": f"terms {calls}"}]
+
+    retriever.document_loader.load_card_documents = load_documents
+
+    assert retriever._load_documents("test_card")[0]["text"] == "terms 1"
+    retriever._loaded_card_ids["test_card"] = time.monotonic() - 2
+    refreshed_documents = retriever._load_documents("test_card")
+
+    assert refreshed_documents == [{"card_id": "test_card", "text": "terms 2"}]
 
 
 def test_local_embedding_cache_is_reused_between_retriever_instances(tmp_path):

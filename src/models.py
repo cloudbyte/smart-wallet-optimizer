@@ -60,12 +60,26 @@ class UserWallet(BaseModel):
     cards: List[CreditCardProfile]
     tie_break_preference: Literal["cash_back", "travel_points"] = "travel_points"
 
+
+class ContextRewardsAssessment(BaseModel):
+    location: LocationContext
+    merchant: MerchantDetails
+    wallet: UserWallet
+    candidate_card_ids: List[str]
+    reward_yields_cents: Dict[str, float]
+
+
+class BenefitsRiskAssessment(BaseModel):
+    evidence_by_card: Dict[str, str]
+    foreign_transaction_fees: Dict[str, float]
+    retrieval_errors: Dict[str, str] = Field(default_factory=dict)
+
+
 class TransactionEvaluationRequest(BaseModel):
     merchant_name: str = Field(..., min_length=1)
     amount: float = Field(
         ...,
         gt=0,
-        le=50_000,
         allow_inf_nan=False,
         description="Transaction amount in USD",
     )
@@ -107,8 +121,10 @@ class TransactionEvaluationResponse(BaseModel):
     recommended_card: Optional[CardRecommendation]
     alternative_cards: List[CardRecommendation]
     assistant_message: Optional[str] = None
+    blocked_reason: Optional[str] = None
     tree_assessment: Optional[str] = None
     requires_approval: bool = False
     approval_reason: Optional[str] = None
+    human_reviewed: bool = False
     audit_trail: List[str] = Field(default_factory=list)
     reasoning_tree: List[ThoughtNode] = Field(default_factory=list)

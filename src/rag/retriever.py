@@ -2,6 +2,7 @@ import hashlib
 import logging
 import re
 from pathlib import Path
+from time import monotonic
 from typing import Callable, Dict, List, Optional, Protocol, Sequence, cast
 
 import chromadb
@@ -52,7 +53,7 @@ class SmartWalletRAG:
         self.embedder = embedder
         self.documents = documents if documents is not None else []
         self._explicit_documents = documents is not None
-        self._loaded_card_ids = set()
+        self._loaded_card_ids: Dict[str, float] = {}
         self.document_loader = IssuerDocumentLoader(
             sources=sources,
             cache_dir=cache_dir,
@@ -81,9 +82,23 @@ class SmartWalletRAG:
         return "\n\n".join(self._format_citation(document) for document in ranked)
 
     def _load_documents(self, card_id: str) -> List[Dict[str, object]]:
-        if not self._explicit_documents and card_id not in self._loaded_card_ids:
-            self.documents.extend(self.document_loader.load_card_documents(card_id))
-            self._loaded_card_ids.add(card_id)
+        if self._explicit_documents:
+            return self.documents
+
+        loaded_at = self._loaded_card_ids.get(card_id)
+        now = monotonic()
+        if (
+            loaded_at is None
+            or now - loaded_at >= self.document_loader.cache_ttl_seconds
+        ):
+            refreshed_documents = self.document_loader.load_card_documents(card_id)
+            self.documents = [
+                document
+                for document in self.documents
+                if document["card_id"] != card_id
+            ]
+            self.documents.extend(refreshed_documents)
+            self._loaded_card_ids[card_id] = now
         return self.documents
 
     def _get_collection_name(self) -> str:

@@ -2,11 +2,12 @@
 
 A Python demo agent built with LangGraph and an open-weight Qwen3 language
 model. Local runs default to Qwen3-0.6B on CPU; the Colab notebook selects
-Qwen3-4B for GPU-backed runs. Qwen selects data tools in a constrained ReAct
-loop, critiques the Tree-of-Thought (ToT) card branches against retrieved
-evidence, and explains the result. Merchant facts, reward calculations, and
-hard eligibility rules come from tools and deterministic code. The project is
-designed for local development and Google Colab.
+Qwen3-4B for GPU-backed runs. LangGraph coordinates three specialized roles:
+context and rewards, benefits and risk, and final decision orchestration. Qwen
+can resolve merchant candidates, critique Tree-of-Thought (ToT) card branches
+against retrieved evidence, and explain the result. Merchant facts, reward
+calculations, and hard eligibility rules come from tools and deterministic
+code. The project is designed for local development and Google Colab.
 
 > **Disclaimer:** This project uses synthetic wallet data and illustrative
 > benefit estimates for demonstration and educational purposes. It is not
@@ -14,8 +15,10 @@ designed for local development and Google Colab.
 
 ## What It Does
 
-- Uses the LLM to choose among merchant, location, wallet, and benefit-retrieval
-  tools; tool observations are added to LangGraph state for subsequent turns.
+- Resolves merchant, location, and wallet context in parallel, then passes
+  structured observations through LangGraph's shared workflow state.
+- Runs separate Context & Rewards, Benefits & Risk, and Decision Orchestrator
+  graph stages with typed handoffs and auditable results.
 - Resolves a merchant to a canonical name and spending category using the local
   merchant dataset. When exact lookup fails, the LLM may select a candidate
   from that catalog; MCC and category always come from the catalog, and
@@ -29,21 +32,29 @@ designed for local development and Google Colab.
 - Accounts for foreign transaction fees and prunes cards where the fee is at
   least the reward yield.
 - Flags transactions for human approval when the merchant context is uncertain,
-  the amount exceeds the configured threshold, or no eligible card remains.
-- Rejects invalid transaction amounts outside the supported range
-  `0 < amount <= $50,000`.
-- Uses the selected Qwen3 model to choose tools, critique the reasoning tree,
-  and explain the structured recommendation.
+  confidence is below 0.70, the amount exceeds $2,500, required benefit
+  retrieval fails, or no eligible card remains.
+- The web app offers a review form to confirm or correct merchant/category
+  context and rerun the recommendation. Review state and corrections are
+  recorded in that evaluation's audit trail; they are not persisted or used to
+  automatically change catalogs or routing rules.
+- Accepts positive finite amounts in the UI, then blocks recommendations through
+  an agent-level guardrail when the amount exceeds `$50,000`.
+- Uses the selected Qwen3 model to resolve ambiguous merchant names, critique
+  the reasoning tree, and explain the structured recommendation.
 - Includes an audit trail and structured evaluation tree in the result.
+- Records end-to-end evaluation latency and uses safe fallbacks when optional
+  model critique or explanation calls fail.
 
-LLM-selected actions are restricted to allowlisted tools and required context
-lookups; an invalid action is logged and replaced with the next required tool.
-The LLM critic can add a grounded qualitative assessment, but cannot change
-calculated values or bypass hard constraints. Benefit guides are downloaded
+The LLM merchant resolver can only select from catalog entries. The LLM critic
+can add a grounded qualitative assessment, but cannot change calculated values
+or bypass hard constraints. Benefit guides are downloaded
 from issuer-hosted public sources into the ignored `.cache/card-benefits`
 directory; they are not bundled in the repository. RAG citations include each
 source URL and PDF page number. Issuer documents can change, so users should
 confirm current eligibility and terms with the issuer.
+Expired cached issuer documents are refreshed before use; if refresh fails,
+the stale copy is withheld and the affected recommendation requires review.
 
 ## Getting Started
 
@@ -108,13 +119,14 @@ the local Qwen model and may take a few minutes while model weights download.
 
 The official source URLs are maintained in
 [`data/benefit_sources.json`](./data/benefit_sources.json) for Chase Sapphire
-Reserve, Capital One Venture X, and American Express Gold. The LangGraph agent
-maintains short-term state through a ReAct tool loop. At
-each turn Qwen chooses an available action; tool observations are added to state
-and provided on the next turn. Merchant, location, and wallet lookups are
-required grounding steps. For regular local purchases under $50, the graph
-skips benefit retrieval. Other transactions retrieve benefits for each active
-card. The agent then performs the full evaluation:
+Reserve, Capital One Venture X, and American Express Gold. The LangGraph
+workflow runs independent merchant, location, and wallet lookups in parallel.
+The Context & Rewards Specialist calculates yields and identifies active card
+candidates; the Benefits & Risk Specialist retrieves relevant evidence when
+needed; and the Decision Orchestrator applies ToT scoring and approval rules.
+For regular local purchases under $50, the graph skips benefit retrieval.
+Other transactions retrieve benefits for each active candidate card. The
+workflow then performs the full evaluation:
 
 1. **Yield:** Calculate base rewards from the merchant category, card
    multiplier, and mock point valuation.
@@ -176,13 +188,26 @@ PYTHONPATH=. pytest
 The tests cover merchant and wallet tools, recommendations, breadth-first
 evaluation, fee pruning, low-value early exit, and approval handling.
 
+## Final Capstone Materials
+
+- [Final capstone report (DOCX)](docs/final_capstone_report.docx)
+- [Final capstone report (PDF)](docs/final_capstone_report.pdf)
+- [Presentation slide deck](docs/final_capstone_presentation.html) — use the
+  arrow keys to navigate and the full-screen control for presenting.
+- [Presentation speaker script](docs/final_capstone_speaker_script.md)
+- [Video submission summary template](docs/final_capstone_video_submission.html)
+
+The report's evaluation results reflect the automated test suite, not a
+production accuracy or latency benchmark. A hosted presentation video must
+still be recorded and submitted separately.
+
 ## Project Layout
 
 ```text
 src/
-  agent/            LangGraph orchestration, state, and graph nodes
+  agent/            LangGraph multi-agent orchestration, state, and role nodes
   main.py           Interactive command-line demo
-  llm.py            Runtime-selected Qwen3 planner, critic, and explainer
+  llm.py            Runtime-selected Qwen3 merchant resolver, critic, and explainer
   models.py         Request, response, wallet, and reasoning models
   reasoning/        Deterministic Tree-of-Thought evaluator and scoring
   safety/           Approval policy and model-output grounding checks
@@ -190,6 +215,6 @@ src/
   tools/            Merchant, location, and wallet data tools
 data/               Synthetic merchant and wallet profiles
 tests/              Unit and integration tests
-docs/               Project checkpoint designs
+docs/               Checkpoint designs and final capstone materials
 Smart_Wallet_Rewards_Optimizer_Colab.ipynb  Google Colab setup and demo notebook
 ```

@@ -10,7 +10,19 @@ from src.models import (
 
 
 HIGH_VALUE_THRESHOLD_USD = 2500.0
+MAX_TRANSACTION_AMOUNT_USD = 50_000.0
 LOCATION_CONFIDENCE_THRESHOLD = 0.70
+
+
+def transaction_block_reason(
+    request: TransactionEvaluationRequest,
+) -> Optional[str]:
+    if request.amount > MAX_TRANSACTION_AMOUNT_USD:
+        return (
+            f"Purchase amount is above the {MAX_TRANSACTION_AMOUNT_USD:,.0f} USD "
+            "limit. Lower it to get a recommendation."
+        )
+    return None
 
 
 def approval_reason(
@@ -19,13 +31,15 @@ def approval_reason(
     has_recommendations: bool,
     merchant: Optional[MerchantDetails] = None,
     requested_category: Optional[str] = None,
+    benefit_retrieval_failed: bool = False,
 ) -> Optional[str]:
     if not has_recommendations:
         return "No eligible wallet card remains after ToT constraint evaluation."
     if request.amount > HIGH_VALUE_THRESHOLD_USD:
         return (
-            f"Transaction amount (${request.amount}) exceeds "
-            f"high-value threshold (${HIGH_VALUE_THRESHOLD_USD:,.0f})."
+            f"Transaction amount {request.amount:,.2f} USD exceeds the "
+            f"high-value threshold of {HIGH_VALUE_THRESHOLD_USD:,.0f} USD. "
+            "Please confirm before relying on this recommendation."
         )
     if merchant is not None and merchant.resolution_method == "ai_candidate":
         return (
@@ -38,6 +52,15 @@ def approval_reason(
             f"We couldn't match “{request.merchant_name}” to the merchant catalog. "
             "Please confirm the merchant and its category; the estimate uses a "
             "general category for now."
+        )
+    if (
+        merchant is not None
+        and merchant.match_confidence < LOCATION_CONFIDENCE_THRESHOLD
+    ):
+        return (
+            f"Merchant/category confidence ({merchant.match_confidence:.2f}) is "
+            f"below {LOCATION_CONFIDENCE_THRESHOLD:.2f}. Please confirm "
+            f"{merchant.canonical_name} and its category."
         )
     if merchant is not None and merchant.requires_confirmation:
         return (
@@ -56,6 +79,12 @@ def approval_reason(
             f"catalog category “{merchant.primary_category}” for "
             f"{merchant.canonical_name}. We used the catalog category; please "
             "confirm it is appropriate."
+        )
+    if benefit_retrieval_failed:
+        return (
+            "Issuer benefit evidence could not be retrieved for one or more "
+            "candidate cards. Please review the card terms before relying on "
+            "benefit estimates."
         )
     if merchant is None and (
         location.confidence_score < LOCATION_CONFIDENCE_THRESHOLD

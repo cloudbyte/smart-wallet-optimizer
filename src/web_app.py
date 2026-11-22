@@ -1,9 +1,12 @@
+from typing import Optional
+
 import streamlit as st
 from pydantic import ValidationError
 
 from src.agent import SmartWalletAgent
 from src.llm import Qwen3AgentModel, default_model_id
 from src.models import TransactionEvaluationRequest, TransactionEvaluationResponse
+from src.safety.guardrails import transaction_block_reason
 
 
 @st.cache_resource
@@ -11,12 +14,128 @@ def get_agent() -> SmartWalletAgent:
     return SmartWalletAgent(explainer=Qwen3AgentModel())
 
 
-def render_result(response: TransactionEvaluationResponse) -> None:
-    if response.requires_approval:
+def evaluate_with_progress(
+    agent: SmartWalletAgent,
+    request: TransactionEvaluationRequest,
+) -> TransactionEvaluationResponse:
+    with st.status("Starting transaction evaluation...", expanded=True) as status:
+        response = agent.evaluate_transaction(
+            request,
+            progress_callback=lambda label: status.update(label=label),
+        )
+        if getattr(response, "blocked_reason", None) is not None:
+            status.update(
+                label="Transaction blocked by the safety limit.",
+                state="error",
+                expanded=True,
+            )
+        else:
+            status.update(
+                label="Evaluation complete.",
+                state="complete",
+                expanded=False,
+            )
+    return response
+
+
+def render_result(
+    response: TransactionEvaluationResponse,
+    request: Optional[TransactionEvaluationRequest] = None,
+) -> None:
+    blocked_reason = (
+        transaction_block_reason(request)
+        if request is not None
+        else getattr(response, "blocked_reason", None)
+    )
+    if blocked_reason is not None:
+        st.warning(blocked_reason, icon="⚠️")
+        return
+
+    if response.requires_approval and response.human_reviewed:
+        st.success(
+            "You reviewed this recommendation. The app has not made or authorized "
+            "a payment."
+        )
+    elif response.requires_approval:
         st.warning(
             f"**Confirmation required**  \n{response.approval_reason}",
             icon="⚠️",
         )
+
+    if response.requires_approval and request is not None:
+        category_options = [
+            "dining",
+            "groceries",
+            "gas",
+            "travel",
+            "wholesale_department",
+            "retail",
+            "pharmacy",
+            "subscriptions",
+            "entertainment",
+            "miscellaneous",
+        ]
+        if response.primary_category not in category_options:
+            category_options.append(response.primary_category)
+        default_category_index = category_options.index(response.primary_category)
+        with st.form("human_review"):
+            st.markdown("#### Review or correct the transaction details")
+            reviewed_merchant = st.text_input(
+                "Confirmed merchant", value=response.merchant_canonical_name
+            )
+            reviewed_category = st.selectbox(
+                "Confirmed category",
+                options=category_options,
+                index=default_category_index,
+            )
+            reviewer_confirmed = st.checkbox(
+                "I reviewed these details and understand this app does not make payments."
+            )
+            review_submitted = st.form_submit_button("Submit review")
+
+        if review_submitted:
+            if not reviewer_confirmed:
+                st.error("Confirm that you reviewed the details before submitting.")
+            elif (
+                reviewed_merchant.strip() != response.merchant_canonical_name
+                or reviewed_category != response.primary_category
+                or (
+                    request.category_hint is not None
+                    and request.category_hint != reviewed_category
+                )
+            ):
+                try:
+                    corrected_request = TransactionEvaluationRequest(
+                        merchant_name=reviewed_merchant,
+                        amount=request.amount,
+                        category_hint=reviewed_category,
+                        is_international=request.is_international,
+                    )
+                except ValidationError as error:
+                    st.error(f"Check the corrected details: {error}")
+                    return
+                corrected_response = evaluate_with_progress(
+                    get_agent(),
+                    corrected_request,
+                )
+                corrected_response.audit_trail.append(
+                    "Human review corrected transaction context: "
+                    f"merchant={corrected_request.merchant_name}; "
+                    f"category={reviewed_category}."
+                )
+                st.session_state["transaction_request"] = corrected_request
+                st.session_state["evaluation_response"] = corrected_response
+                st.rerun()
+            else:
+                reviewed_response = response.model_copy(
+                    update={"human_reviewed": True}
+                )
+                reviewed_response.audit_trail.append(
+                    "User confirmed review of the transaction context and "
+                    "recommendation; no payment was executed."
+                )
+                st.session_state["evaluation_response"] = reviewed_response
+                st.rerun()
 
     recommendation = response.recommended_card
     if recommendation is None:
@@ -189,11 +308,13 @@ def main() -> None:
             amount = st.number_input(
                 "Purchase amount",
                 min_value=0.01,
-                max_value=50_000.0,
                 value=75.50,
                 step=1.0,
                 format="%.2f",
-                help="Amount in US dollars.",
+                help=(
+                    "Amount in US dollars. Recommendations are blocked for "
+                    "amounts over $50,000."
+                ),
             )
         confirm_col, submit_col = st.columns([1.6, 1], gap="medium")
         with confirm_col:
@@ -220,15 +341,24 @@ def main() -> None:
             st.error(f"Check the transaction details: {error}")
             return
 
-        with st.spinner("Evaluating merchant, wallet, and card benefits..."):
-            response = get_agent().evaluate_transaction(request)
+        response = evaluate_with_progress(get_agent(), request)
+        st.session_state["transaction_request"] = request
         st.session_state["evaluation_response"] = response
 
     response = st.session_state.get("evaluation_response")
     if response is not None:
         st.divider()
-        st.markdown("### Recommendation")
-        render_result(response)
+        request = st.session_state.get("transaction_request")
+        blocked_reason = (
+            transaction_block_reason(request)
+            if request is not None
+            else getattr(response, "blocked_reason", None)
+        )
+        heading = (
+            "Transaction blocked" if blocked_reason is not None else "Recommendation"
+        )
+        st.markdown(f"### {heading}")
+        render_result(response, request)
 
 
 if __name__ == "__main__":

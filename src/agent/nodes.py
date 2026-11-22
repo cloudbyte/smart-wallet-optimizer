@@ -1,14 +1,14 @@
 import json
+import logging
 from typing import Dict, List, Optional
 
 from src.models import (
-    LocationContext,
+    BenefitsRiskAssessment,
+    ContextRewardsAssessment,
     LocationInput,
     MerchantDetails,
-    ThoughtNode,
     TransactionEvaluationRequest,
     TransactionEvaluationResponse,
-    UserWallet,
 )
 from src.rag.retriever import SmartWalletRAG
 from src.safety.guardrails import (
@@ -22,9 +22,12 @@ from src.tools.wallet import get_user_wallet
 from src.reasoning.tot import (
     HIGH_RISK_CATEGORIES,
     LOW_VALUE_THRESHOLD_USD,
+    calculate_reward_yields,
     evaluate_wallet_tree,
 )
 from src.agent.state import AgentLanguageModel, AgentState
+
+LOGGER = logging.getLogger(__name__)
 
 
 class TransactionAgentNodes:
@@ -43,184 +46,155 @@ class TransactionAgentNodes:
 
     def _initialize(self, state: AgentState) -> AgentState:
         return {
-            "phase": "context",
-            "pending_actions": [
-                "resolve_location",
-                "lookup_merchant",
-                "get_wallet",
-            ],
-            "benefit_evidence": {},
-            "audit_trail": [
-                "Started ReAct agent loop; the language model selects among "
-                "the available data tools."
-            ],
+            "audit_trail": ["Started coordinated multi-agent evaluation."],
         }
 
-    def _plan_action(self, state: AgentState) -> AgentState:
-        available = state["pending_actions"]
-        if not available:
-            raise RuntimeError("ReAct planner was called with no available actions.")
-
-        selected = None
-        choose_tool = getattr(self.language_model, "choose_tool", None)
-        if callable(choose_tool):
-            context = {
-                "request": state["request"].model_dump(),
-                "phase": state["phase"],
-                "location": (
-                    state["location_context"].model_dump()
-                    if "location_context" in state
-                    else None
-                ),
-                "merchant": (
-                    state["merchant"].model_dump() if "merchant" in state else None
-                ),
-                "wallet_cards": (
-                    [
-                        {
-                            "card_id": card.card_id,
-                            "card_name": card.card_name,
-                            "is_frozen": card.is_frozen,
-                            "is_expired": card.is_expired,
-                        }
-                        for card in state["wallet"].cards
-                    ]
-                    if "wallet" in state
-                    else None
-                ),
-                "retrieved_benefit_evidence": state.get("benefit_evidence", {}),
-                "completed_actions": [
-                    action
-                    for action in [
-                        "resolve_location",
-                        "lookup_merchant",
-                        "get_wallet",
-                    ]
-                    if action not in available
-                ],
-            }
-            selected = choose_tool(json.dumps(context), list(available))
-
-        audit = state["audit_trail"]
-        if selected not in available:
-            selected = available[0]
-            if callable(choose_tool):
-                audit.append(
-                    "ReAct planner returned an unavailable action; executing the "
-                    "next required tool instead."
-                )
-        else:
-            audit.append(f"ReAct planner selected tool: {selected}.")
-        return {"next_action": selected, "audit_trail": audit}
-
-    def _execute_tool(self, state: AgentState) -> AgentState:
-        action = state["next_action"]
+    def _resolve_location(self, state: AgentState) -> AgentState:
         request = state["request"]
-        update: AgentState = {}
-        audit = state["audit_trail"]
-        evidence = state["benefit_evidence"]
-
-        if action == "resolve_location":
-            location = resolve_location(
-                LocationInput(venue_override=request.merchant_name)
-            )
-            update["location_context"] = location
-            audit.append(
-                f"Tool resolve_location observation: {location.venue_name}; "
+        location = resolve_location(
+            LocationInput(venue_override=request.merchant_name)
+        )
+        return {
+            "location_context": location,
+            "location_audit": (
+                f"Location resolved: {location.venue_name}; "
                 f"category={location.inferred_category}; "
                 f"confidence={location.confidence_score}; "
                 f"ambiguous={location.is_ambiguous}."
-            )
-        elif action == "lookup_merchant":
-            resolver = getattr(self.language_model, "resolve_merchant", None)
-            merchant = lookup_merchant(
-                MerchantLookupInput(raw_merchant_name=request.merchant_name),
-                resolver=resolver if callable(resolver) else None,
-            )
-            update["merchant"] = merchant
-            audit.append(
-                f"Tool lookup_merchant observation: {merchant.canonical_name}; "
+            ),
+        }
+
+    def _lookup_merchant(self, state: AgentState) -> AgentState:
+        request = state["request"]
+        resolver = getattr(self.language_model, "resolve_merchant", None)
+        merchant = lookup_merchant(
+            MerchantLookupInput(raw_merchant_name=request.merchant_name),
+            resolver=resolver if callable(resolver) else None,
+        )
+        return {
+            "merchant": merchant,
+            "merchant_audit": (
+                f"Merchant resolved: {merchant.canonical_name}; "
                 f"MCC={merchant.mcc_code}; category={merchant.primary_category}; "
                 f"resolution={merchant.resolution_method}; "
                 f"confidence={merchant.match_confidence}; "
                 f"confirmation_required={merchant.requires_confirmation}; "
                 f"notes={merchant.notes or 'none'}."
-            )
-        elif action == "get_wallet":
-            wallet = get_user_wallet(self.user_id)
-            update["wallet"] = wallet
-            active_count = sum(
-                not card.is_frozen and not card.is_expired for card in wallet.cards
-            )
-            audit.append(
-                f"Tool get_wallet observation: {active_count} eligible cards "
-                f"for user {wallet.user_id}."
-            )
-        elif action.startswith("query_benefits:"):
-            card_id = action.partition(":")[2]
-            wallet = state.get("wallet")
-            if wallet is None or card_id not in {card.card_id for card in wallet.cards}:
-                raise ValueError(f"ReAct planner selected unknown card: {card_id}")
-            category = state["merchant"].primary_category
-            query = (
-                f"{category} purchase protection and extended warranty"
-            )
-            retrieved = self.rag.query_benefits(card_id, query)
-            evidence[card_id] = retrieved
-            audit.append(
-                f"Tool query_benefits observation for {card_id}: "
-                f"{retrieved or 'no matching benefit evidence found'}."
-            )
-            update["benefit_evidence"] = evidence
-        else:
-            raise ValueError(f"Unsupported ReAct tool action: {action}")
+            ),
+        }
 
-        pending = [item for item in state["pending_actions"] if item != action]
-        if len(pending) == len(state["pending_actions"]):
-            raise RuntimeError(f"ReAct action was not pending: {action}")
-        update["pending_actions"] = pending
-        update["audit_trail"] = audit
-        return update
+    def _load_wallet(self, _state: AgentState) -> AgentState:
+        wallet = get_user_wallet(self.user_id)
+        active_count = sum(
+            not card.is_frozen and not card.is_expired for card in wallet.cards
+        )
+        return {
+            "wallet": wallet,
+            "wallet_audit": (
+                f"Loaded synthetic wallet for {wallet.user_id} with "
+                f"{active_count} eligible cards."
+            ),
+        }
 
-    def _after_tool(self, state: AgentState) -> str:
-        if state["pending_actions"]:
-            return "plan_action"
-        if state["phase"] == "context":
-            return "prepare_benefit_queries"
-        return "evaluate_cards"
-
-    def _prepare_benefit_queries(self, state: AgentState) -> AgentState:
+    def _context_rewards_specialist(self, state: AgentState) -> AgentState:
         request = state["request"]
-        category = state["merchant"].primary_category
+        merchant = state["merchant"]
+        wallet = state["wallet"]
+        reward_yields = calculate_reward_yields(
+            request=request,
+            wallet=wallet,
+            category=merchant.primary_category,
+            qualifies_for_supermarket_multipliers=(
+                merchant.qualifies_for_supermarket_multipliers
+            ),
+        )
+        audit = [
+            *state["audit_trail"],
+            state["location_audit"],
+            state["merchant_audit"],
+            state["wallet_audit"],
+            (
+                "Agent 1 (Context & Rewards Specialist) identified "
+                f"{len(reward_yields)} candidate cards and calculated reward yields."
+            ),
+        ]
+        candidate_card_ids = list(reward_yields)
+        return {
+            "context_assessment": ContextRewardsAssessment(
+                location=state["location_context"],
+                merchant=merchant,
+                wallet=wallet,
+                candidate_card_ids=candidate_card_ids,
+                reward_yields_cents=reward_yields,
+            ),
+            "candidate_cards": candidate_card_ids,
+            "audit_trail": audit,
+        }
+
+    def _benefits_risk_specialist(self, state: AgentState) -> AgentState:
+        request = state["request"]
+        context = state["context_assessment"]
+        category = context.merchant.primary_category
+        audit = state["audit_trail"]
         early_exit = (
             request.amount < LOW_VALUE_THRESHOLD_USD
             and not request.is_international
             and category not in HIGH_RISK_CATEGORIES
         )
+        evidence_by_card: Dict[str, str] = {}
+        retrieval_errors: Dict[str, str] = {}
         if early_exit:
-            actions = []
-            state["audit_trail"].append(
-                "ReAct skipped benefit retrieval because this is a low-value, "
-                "local, non-high-risk transaction."
+            audit.append(
+                "Agent 2 (Benefits & Risk Specialist) early exit: skipped "
+                "policy retrieval "
+                "for a low-value, local, non-high-risk transaction."
             )
         else:
-            actions = [
-                f"query_benefits:{card.card_id}"
-                for card in state["wallet"].cards
-                if not card.is_frozen and not card.is_expired
-            ]
-        state["phase"] = "benefits"
-        state["pending_actions"] = actions
-        return state
+            for card_id in context.candidate_card_ids:
+                query = f"{category} purchase protection and extended warranty"
+                try:
+                    retrieved = self.rag.query_benefits(card_id, query)
+                except (OSError, RuntimeError, ValueError) as error:
+                    retrieval_errors[card_id] = type(error).__name__
+                    LOGGER.warning(
+                        "Benefit retrieval failed for card %s (%s).",
+                        card_id,
+                        type(error).__name__,
+                    )
+                    audit.append(
+                        f"Policy retrieval failed for {card_id} "
+                        f"({type(error).__name__}); benefit claims are withheld."
+                    )
+                else:
+                    evidence_by_card[card_id] = retrieved
+                    audit.append(
+                        f"Policy retrieval for {card_id}: "
+                        f"{retrieved or 'no matching benefit evidence found'}."
+                    )
+            audit.append(
+                "Agent 2 (Benefits & Risk Specialist) returned retrieved evidence "
+                "and wallet fee data."
+            )
+        card_by_id = {card.card_id: card for card in context.wallet.cards}
+        return {
+            "benefits_assessment": BenefitsRiskAssessment(
+                evidence_by_card=evidence_by_card,
+                foreign_transaction_fees={
+                    card_id: card_by_id[card_id].foreign_transaction_fee
+                    for card_id in context.candidate_card_ids
+                },
+                retrieval_errors=retrieval_errors,
+            ),
+            "audit_trail": audit,
+        }
 
-    def _after_benefit_planning(self, state: AgentState) -> str:
-        return "plan_action" if state["pending_actions"] else "evaluate_cards"
-
-    def _evaluate_cards(self, state: AgentState) -> AgentState:
+    def _decision_orchestrator(self, state: AgentState) -> AgentState:
         request = state["request"]
-        location = state["location_context"]
-        merchant = state["merchant"]
-        wallet = state["wallet"]
+        context = state["context_assessment"]
+        benefits = state["benefits_assessment"]
+        location = context.location
+        merchant = context.merchant
+        wallet = context.wallet
         audit = state["audit_trail"]
         category = merchant.primary_category
         recommendations, reasoning_tree, tree_audit = evaluate_wallet_tree(
@@ -230,15 +204,21 @@ class TransactionAgentNodes:
             qualifies_for_supermarket_multipliers=(
                 merchant.qualifies_for_supermarket_multipliers
             ),
-            query_benefits=lambda card_id, _query: state["benefit_evidence"].get(
+            query_benefits=lambda card_id, _query: benefits.evidence_by_card.get(
                 card_id, ""
             ),
+            reward_yields_cents=context.reward_yields_cents,
+            foreign_transaction_fees=benefits.foreign_transaction_fees,
         )
         audit.extend(tree_audit)
         audit.append(
             "Tree-of-Thought card evaluation complete: "
             f"{len(reasoning_tree)} nodes across "
             f"{len({node.depth for node in reasoning_tree})} depth(s)."
+        )
+        audit.append(
+            "Agent 3 (Decision Orchestrator) applied Tree-of-Thought evaluation "
+            "and hard constraints."
         )
 
         approval_reason_text = approval_reason(
@@ -247,22 +227,28 @@ class TransactionAgentNodes:
             has_recommendations=bool(recommendations),
             merchant=merchant,
             requested_category=request.category_hint,
+            benefit_retrieval_failed=bool(benefits.retrieval_errors),
         )
         if approval_reason_text:
             audit.append(f"HITL Triggered: {approval_reason_text}")
 
+        recommended_card = recommendations[0] if recommendations else None
         result = TransactionEvaluationResponse(
             merchant_canonical_name=merchant.canonical_name,
             mcc_code=merchant.mcc_code,
             primary_category=category,
-            recommended_card=recommendations[0] if recommendations else None,
+            recommended_card=recommended_card,
             alternative_cards=recommendations[1:],
             requires_approval=approval_reason_text is not None,
             approval_reason=approval_reason_text,
             audit_trail=audit,
             reasoning_tree=reasoning_tree,
         )
-        return {"response": result}
+        return {
+            "recommended_card": recommended_card,
+            "reasoning_tree": reasoning_tree,
+            "response": result,
+        }
 
     def _critique_tree(self, state: AgentState) -> AgentState:
         critique_tree = getattr(self.language_model, "critique_tree", None)
@@ -284,7 +270,18 @@ class TransactionAgentNodes:
                 node.model_dump() for node in response.reasoning_tree
             ],
         }
-        generated = critique_tree(json.dumps(facts, indent=2))
+        try:
+            generated = critique_tree(json.dumps(facts, indent=2))
+        except (OSError, RuntimeError, ValueError) as error:
+            LOGGER.warning(
+                "Tree critique failed (%s); omitting optional critique.",
+                type(error).__name__,
+            )
+            response.audit_trail.append(
+                "ToT critic failed; omitted the optional critique "
+                f"({type(error).__name__})."
+            )
+            return {"response": response}
         if is_grounded_critique(generated, response):
             response.tree_assessment = generated
             response.audit_trail.append(
@@ -296,7 +293,10 @@ class TransactionAgentNodes:
                 "ToT critic output was omitted because it could not be verified "
                 "against the retrieved evidence."
             )
-        return {"response": response}
+        return {
+            "tree_assessment": response.tree_assessment,
+            "response": response,
+        }
 
     def _generate_explanation(self, state: AgentState) -> AgentState:
         if self.language_model is None:
@@ -324,7 +324,18 @@ class TransactionAgentNodes:
                 "tree_assessment": response.tree_assessment,
             },
         }
-        generated = self.language_model.explain(json.dumps(facts, indent=2))
+        try:
+            generated = self.language_model.explain(json.dumps(facts, indent=2))
+        except (OSError, RuntimeError, ValueError) as error:
+            LOGGER.warning(
+                "Recommendation explanation failed (%s); using factual fallback.",
+                type(error).__name__,
+            )
+            generated = ""
+            response.audit_trail.append(
+                "Model explanation failed; used a factual fallback "
+                f"({type(error).__name__})."
+            )
         if is_grounded_summary(generated, response):
             response.assistant_message = generated
             response.audit_trail.append(
@@ -347,4 +358,7 @@ class TransactionAgentNodes:
                 "Replaced the model explanation with a verified summary because "
                 "it included unsupported details."
             )
-        return {"response": response}
+        return {
+            "assistant_message": response.assistant_message,
+            "response": response,
+        }
