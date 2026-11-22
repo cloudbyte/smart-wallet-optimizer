@@ -5,6 +5,7 @@ from streamlit.testing.v1 import AppTest
 
 from src.models import (
     CardRecommendation,
+    ThoughtNode,
     TransactionEvaluationRequest,
     TransactionEvaluationResponse,
 )
@@ -19,8 +20,83 @@ def test_streamlit_app_loads_form_without_loading_model():
     assert not app.exception
     assert any("Smart Wallet Rewards Optimizer" in item.value for item in app.markdown)
     assert any("Synthetic demo" in item.value for item in app.caption)
+    assert app.selectbox[0].label == "AI model"
+    assert app.selectbox[0].value == "Qwen3 0.6B (local)"
     assert app.text_input[0].label == "Merchant"
     assert app.button[0].label == "Find my best card →"
+
+
+def test_claude_model_requires_api_key_without_evaluating_or_persisting_it():
+    app = AppTest.from_file(str(WEB_APP_PATH)).run()
+
+    app.selectbox[0].select("Claude Sonnet 4.5").run()
+    merchant_input = next(item for item in app.text_input if item.label == "Merchant")
+    merchant_input.set_value("Trader Joe's")
+    app.number_input[0].set_value(125.0)
+    app.button[0].click().run()
+
+    assert not app.exception
+    assert any("Enter your Anthropic API key" in item.value for item in app.error)
+    assert "evaluation_response" not in app.session_state
+    assert next(
+        item for item in app.text_input if item.label == "Anthropic API key"
+    ).value == ""
+    assert next(item for item in app.text_input if item.label == "Merchant").value == "Trader Joe's"
+
+
+def test_changing_model_clears_an_unsubmitted_claude_key():
+    app = AppTest.from_file(str(WEB_APP_PATH)).run()
+
+    app.selectbox[0].select("Claude Sonnet 4.5").run()
+    next(item for item in app.text_input if item.label == "Anthropic API key").set_value(
+        "sk-ant-unsent-test"
+    )
+    app.run()
+    app.selectbox[0].select("Qwen3 0.6B (local)").run()
+    app.selectbox[0].select("Claude Sonnet 4.5").run()
+
+    assert not app.exception
+    assert next(
+        item for item in app.text_input if item.label == "Anthropic API key"
+    ).value == ""
+
+
+def test_claude_api_key_is_used_and_form_requests_reset_after_submission(monkeypatch):
+    from src.agent import SmartWalletAgent
+
+    captured_keys = []
+
+    def fake_model_init(self, model_id, api_key):
+        captured_keys.append(api_key)
+
+    def fake_evaluate(self, request, progress_callback=None):
+        return TransactionEvaluationResponse(
+            merchant_canonical_name=request.merchant_name,
+            mcc_code="5411",
+            primary_category="groceries",
+            recommended_card=None,
+            alternative_cards=[],
+        )
+
+    monkeypatch.setattr("src.llm.AnthropicClaudeModel.__init__", fake_model_init)
+    monkeypatch.setattr(SmartWalletAgent, "evaluate_transaction", fake_evaluate)
+
+    app = AppTest.from_file(str(WEB_APP_PATH)).run()
+    app.selectbox[0].select("Claude Sonnet 4.5").run()
+    next(item for item in app.text_input if item.label == "Anthropic API key").set_value(
+        "sk-ant-transient-test"
+    )
+    app.button[0].click().run()
+
+    assert not app.exception
+    assert captured_keys == ["sk-ant-transient-test"]
+    assert "evaluation_response" in app.session_state
+    transaction_form = next(
+        form
+        for form in app.get("form")
+        if form.proto.form.form_id == "transaction"
+    )
+    assert transaction_form.proto.form.clear_on_submit
 
 
 def test_streamlit_app_renders_structured_recommendation():
@@ -40,12 +116,26 @@ def test_streamlit_app_renders_structured_recommendation():
             foreign_transaction_fee=0.0,
         ),
         alternative_cards=[],
+        reasoning_tree=[
+            ThoughtNode(
+                depth=1,
+                card_id="amex_gold",
+                status="evaluated",
+                net_value_cents=680.0,
+            )
+        ],
+        audit_trail=["Loaded synthetic wallet data."],
     )
 
     app.run()
 
     assert not app.exception
     assert any("American Express Gold Card" in item.value for item in app.markdown)
+    assert any("--- EVALUATION RESULTS ---" in item.value for item in app.markdown)
+    assert any("ToT Evaluation:" in item.value for item in app.markdown)
+    assert any("Audit Trail:" in item.value for item in app.markdown)
+    assert any("Loaded synthetic wallet data." in item.value for item in app.markdown)
+    assert app.dataframe
 
 
 def test_streamlit_app_handles_response_cached_before_blocked_reason_field():
@@ -85,6 +175,8 @@ def test_streamlit_allows_over_limit_amount_but_guardrail_blocks_recommendation(
     assert "Lower it to get a recommendation." in warning
     assert "$" not in warning
     assert any("Transaction blocked" in item.value for item in app.markdown)
+    assert any("ToT Evaluation:" in item.value for item in app.markdown)
+    assert any("Audit Trail:" in item.value for item in app.markdown)
     assert not any("Recommended card" in item.value for item in app.markdown)
 
 

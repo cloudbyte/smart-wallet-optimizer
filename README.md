@@ -7,7 +7,9 @@ context and rewards, benefits and risk, and final decision orchestration. Qwen
 can resolve merchant candidates, critique Tree-of-Thought (ToT) card branches
 against retrieved evidence, and explain the result. Merchant facts, reward
 calculations, and hard eligibility rules come from tools and deterministic
-code. The project is designed for local development and Google Colab.
+code. The Streamlit UI also lets you choose Claude Sonnet 4.5, Haiku 4.5, or
+Opus 4.1 for those bounded language tasks. The project is designed for local
+development and Google Colab.
 
 > **Disclaimer:** This project uses synthetic wallet data and illustrative
 > benefit estimates for demonstration and educational purposes. It is not
@@ -40,8 +42,8 @@ code. The project is designed for local development and Google Colab.
   automatically change catalogs or routing rules.
 - Accepts positive finite amounts in the UI, then blocks recommendations through
   an agent-level guardrail when the amount exceeds `$50,000`.
-- Uses the selected Qwen3 model to resolve ambiguous merchant names, critique
-  the reasoning tree, and explain the structured recommendation.
+- Uses the selected Qwen3 or Claude model to resolve ambiguous merchant names,
+  critique the reasoning tree, and explain the structured recommendation.
 - Includes an audit trail and structured evaluation tree in the result.
 - Records end-to-end evaluation latency and uses safe fallbacks when optional
   model critique or explanation calls fail.
@@ -112,8 +114,20 @@ PYTHONPATH=. streamlit run src/web_app.py
 ```
 
 Streamlit opens the app at `http://localhost:8501`. It shares the same agent
-and evaluation logic as the command-line demo. The first recommendation loads
-the local Qwen model and may take a few minutes while model weights download.
+and evaluation logic as the command-line demo. Choose a model using the
+**AI model** selector. The local Qwen option needs no API key; its first
+recommendation may take a few minutes while model weights download. Claude
+options require an Anthropic API key, entered in the password field for each
+evaluation or corrected-context re-evaluation.
+
+The app does not write the Anthropic API key to disk, an environment variable,
+or a persistent client cache; it is held in memory for the submitted operation
+and the password field clears on submission. Choosing Claude sends the key and
+the relevant evaluation prompt to Anthropic over HTTPS. Prompts can include
+the merchant, transaction amount, catalog candidates, recommendation facts,
+and retrieved benefit excerpts. Anthropic API usage may incur charges under
+your account. Do not enter real financial account data, credentials, or
+personally identifying information.
 
 ## Recommendation Flow
 
@@ -207,7 +221,7 @@ still be recorded and submitted separately.
 src/
   agent/            LangGraph multi-agent orchestration, state, and role nodes
   main.py           Interactive command-line demo
-  llm.py            Runtime-selected Qwen3 merchant resolver, critic, and explainer
+  llm.py            Qwen3 and Anthropic Claude merchant resolver, critic, and explainer
   models.py         Request, response, wallet, and reasoning models
   reasoning/        Deterministic Tree-of-Thought evaluator and scoring
   safety/           Approval policy and model-output grounding checks

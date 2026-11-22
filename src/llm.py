@@ -3,16 +3,25 @@ import os
 import sys
 from typing import List, Optional
 
+import requests
+
 from src.models import MerchantResolution
 
 
 LOCAL_MODEL_ID = "Qwen/Qwen3-0.6B"
 COLAB_MODEL_ID = "Qwen/Qwen3-4B"
+CLAUDE_MODEL_IDS = {
+    "Claude Sonnet 4.5": "claude-sonnet-4-5",
+    "Claude Haiku 4.5": "claude-haiku-4-5",
+    "Claude Opus 4.1": "claude-opus-4-1",
+}
 MODEL_ENV_VAR = "WALLET_AGENT_MODEL"
 DEVICE_ENV_VAR = "WALLET_AGENT_DEVICE"
 FOUR_BIT_ENV_VAR = "WALLET_AGENT_4BIT"
 DEFAULT_EMBEDDING_MODEL_ID = "sentence-transformers/all-MiniLM-L6-v2"
 MAX_INPUT_TOKENS = 2048
+ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages"
+ANTHROPIC_API_VERSION = "2023-06-01"
 
 
 def is_colab_runtime() -> bool:
@@ -245,6 +254,133 @@ class Qwen3AgentModel:
         if not response:
             raise RuntimeError(f"{self.model_id} returned an empty explanation.")
         return response
+
+
+class AnthropicClaudeModel:
+    def __init__(self, model_id: str, api_key: str) -> None:
+        normalized_key = api_key.strip()
+        if not normalized_key:
+            raise ValueError("An Anthropic API key is required.")
+        if model_id not in CLAUDE_MODEL_IDS.values():
+            raise ValueError(f"Unsupported Claude model: {model_id}")
+        self.model_id = model_id
+        self._api_key = normalized_key
+
+    def choose_tool(self, context: str, available_actions: List[str]) -> Optional[str]:
+        generated = self._generate(
+            "You are the action selector in a credit-card recommendation agent. "
+            "Choose exactly one action from available_actions. Use the observations "
+            "to choose the most useful next tool. Never invent an action. Return "
+            'only a JSON object in this form: {"action":"exact_action_name"}.',
+            json.dumps(
+                {"context": json.loads(context), "available_actions": available_actions},
+                indent=2,
+            ),
+            max_new_tokens=48,
+        )
+        try:
+            action = json.loads(generated).get("action")
+        except (json.JSONDecodeError, AttributeError):
+            return None
+        return action if isinstance(action, str) else None
+
+    def critique_tree(self, facts: str) -> str:
+        return self._generate(
+            "You are a critic comparing candidate card branches in a Tree-of-Thought "
+            "agent. Use only the supplied recommendations, node values, and retrieved "
+            "evidence. Write one concise qualitative sentence naming a candidate and "
+            "copying an exact phrase from its retrieved evidence. Do not invent "
+            "benefits, rules, or conditions. Do not write numbers, dollar values, "
+            "percentages, or claims not directly supported by the evidence.",
+            facts,
+            max_new_tokens=96,
+        )
+
+    def resolve_merchant(
+        self, merchant_name: str, candidates: List[str]
+    ) -> Optional[MerchantResolution]:
+        generated = self._generate(
+            "Resolve the user's merchant text to one entry from the supplied "
+            "catalog names. The catalog is authoritative. Do not invent merchant "
+            "names, MCCs, or categories. If no candidate is a clear match, return "
+            'exactly {"canonical_name": null, "confidence": 0.0}. Otherwise return '
+            'JSON with the exact catalog name and your match confidence from 0 to 1.',
+            json.dumps(
+                {"merchant_text": merchant_name, "catalog_names": candidates},
+                ensure_ascii=True,
+            ),
+            max_new_tokens=64,
+        )
+        try:
+            result = MerchantResolution.model_validate_json(generated)
+        except ValueError:
+            return None
+        if result.canonical_name not in candidates:
+            return None
+        return result
+
+    def explain(self, facts: str) -> str:
+        return self._generate(
+            "You explain a credit-card recommendation to a user. "
+            "Use only the supplied JSON facts. Write at most two short "
+            "sentences. The recommendation and calculations are already "
+            "determined; do not change the selected card. Name the "
+            "recommended card and briefly relate it to the merchant or "
+            "category. Do not include numbers, financial terms, fees, "
+            "approvals, eligibility, or card benefits.",
+            facts,
+            max_new_tokens=96,
+        )
+
+    def _generate(
+        self, system_prompt: str, facts: str, max_new_tokens: int
+    ) -> str:
+        try:
+            response = requests.post(
+                ANTHROPIC_MESSAGES_URL,
+                headers={
+                    "x-api-key": self._api_key,
+                    "anthropic-version": ANTHROPIC_API_VERSION,
+                    "content-type": "application/json",
+                },
+                json={
+                    "model": self.model_id,
+                    "max_tokens": max_new_tokens,
+                    "system": system_prompt,
+                    "messages": [{"role": "user", "content": facts}],
+                },
+                timeout=(10, 60),
+            )
+        except requests.RequestException as error:
+            raise RuntimeError(
+                "Claude API request failed; check connectivity and API access."
+            ) from error
+
+        if not 200 <= response.status_code < 300:
+            raise RuntimeError(
+                f"Claude API returned HTTP {response.status_code}; check the API "
+                "key, model access, and billing."
+            )
+        try:
+            payload = response.json()
+        except ValueError as error:
+            raise RuntimeError("Claude API returned an invalid response.") from error
+        if not isinstance(payload, dict):
+            raise RuntimeError("Claude API returned an invalid response.")
+        content = payload.get("content")
+        if not isinstance(content, list):
+            raise RuntimeError("Claude API response did not contain text.")
+        text = " ".join(
+            block["text"].strip()
+            for block in content
+            if isinstance(block, dict)
+            and block.get("type") == "text"
+            and isinstance(block.get("text"), str)
+            and block["text"].strip()
+        ).strip()
+        if not text:
+            raise RuntimeError("Claude API response did not contain text.")
+        return text
 
 
 Qwen3Explainer = Qwen3AgentModel

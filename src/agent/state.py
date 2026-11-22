@@ -23,8 +23,6 @@ class AgentLanguageModel(Protocol):
 
     def critique_tree(self, facts: str) -> str: ...
 
-    def embed(self, text: str) -> List[float]: ...
-
 
 class AgentState(TypedDict, total=False):
     request: TransactionEvaluationRequest

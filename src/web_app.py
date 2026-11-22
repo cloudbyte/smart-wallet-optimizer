@@ -4,14 +4,48 @@ import streamlit as st
 from pydantic import ValidationError
 
 from src.agent import SmartWalletAgent
-from src.llm import Qwen3AgentModel, default_model_id
+from src.llm import (
+    CLAUDE_MODEL_IDS,
+    LOCAL_MODEL_ID,
+    AnthropicClaudeModel,
+    Qwen3AgentModel,
+    default_model_id,
+)
 from src.models import TransactionEvaluationRequest, TransactionEvaluationResponse
 from src.safety.guardrails import transaction_block_reason
+
+
+LOCAL_MODEL_LABEL = "Qwen3 0.6B (local)"
+MODEL_OPTIONS = {
+    LOCAL_MODEL_LABEL: None,
+    **CLAUDE_MODEL_IDS,
+}
 
 
 @st.cache_resource
 def get_agent() -> SmartWalletAgent:
     return SmartWalletAgent(explainer=Qwen3AgentModel())
+
+
+def clear_previous_evaluation() -> None:
+    st.session_state.pop("transaction_request", None)
+    st.session_state.pop("evaluation_response", None)
+    st.session_state.pop("selected_model", None)
+    st.session_state.pop("anthropic_api_key", None)
+    st.session_state.pop("review_anthropic_api_key", None)
+
+
+def build_agent(model_label: str, api_key: str = "") -> SmartWalletAgent:
+    if model_label not in MODEL_OPTIONS:
+        raise ValueError(f"Unsupported AI model: {model_label}")
+    model_id = MODEL_OPTIONS.get(model_label)
+    if model_id is None:
+        return get_agent()
+    if not api_key.strip():
+        raise ValueError("Enter your Anthropic API key to use a Claude model.")
+    return SmartWalletAgent(
+        explainer=AnthropicClaudeModel(model_id=model_id, api_key=api_key)
+    )
 
 
 def evaluate_with_progress(
@@ -38,9 +72,38 @@ def evaluate_with_progress(
     return response
 
 
+def render_evaluation_trace(response: TransactionEvaluationResponse) -> None:
+    st.markdown("### 🌳 ToT Evaluation:")
+    if response.reasoning_tree:
+        st.dataframe(
+            [
+                {
+                    "Depth": node.depth,
+                    "Card": node.card_id,
+                    "Status": node.status,
+                    "Net value (¢)": node.net_value_cents,
+                    "Evidence": node.evidence,
+                }
+                for node in response.reasoning_tree
+            ],
+            hide_index=True,
+            use_container_width=True,
+        )
+    else:
+        st.caption("No Tree-of-Thought branches were generated for this evaluation.")
+
+    st.markdown("### 📋 Audit Trail:")
+    if response.audit_trail:
+        for item in response.audit_trail:
+            st.markdown(f"- {item}")
+    else:
+        st.caption("No audit events were recorded.")
+
+
 def render_result(
     response: TransactionEvaluationResponse,
     request: Optional[TransactionEvaluationRequest] = None,
+    model_label: str = LOCAL_MODEL_LABEL,
 ) -> None:
     blocked_reason = (
         transaction_block_reason(request)
@@ -49,6 +112,7 @@ def render_result(
     )
     if blocked_reason is not None:
         st.warning(blocked_reason, icon="⚠️")
+        render_evaluation_trace(response)
         return
 
     if response.requires_approval and response.human_reviewed:
@@ -78,7 +142,7 @@ def render_result(
         if response.primary_category not in category_options:
             category_options.append(response.primary_category)
         default_category_index = category_options.index(response.primary_category)
-        with st.form("human_review"):
+        with st.form("human_review", clear_on_submit=True):
             st.markdown("#### Review or correct the transaction details")
             reviewed_merchant = st.text_input(
                 "Confirmed merchant", value=response.merchant_canonical_name
@@ -91,6 +155,17 @@ def render_result(
             reviewer_confirmed = st.checkbox(
                 "I reviewed these details and understand this app does not make payments."
             )
+            review_api_key = ""
+            if model_label != LOCAL_MODEL_LABEL:
+                review_api_key = st.text_input(
+                    "Anthropic API key",
+                    type="password",
+                    key="review_anthropic_api_key",
+                    help=(
+                        "Used only for this re-evaluation and cleared when you "
+                        "submit the review."
+                    ),
+                )
             review_submitted = st.form_submit_button("Submit review")
 
         if review_submitted:
@@ -104,6 +179,9 @@ def render_result(
                     and request.category_hint != reviewed_category
                 )
             ):
+                if model_label != LOCAL_MODEL_LABEL and not review_api_key.strip():
+                    st.error("Enter your Anthropic API key to re-evaluate.")
+                    return
                 try:
                     corrected_request = TransactionEvaluationRequest(
                         merchant_name=reviewed_merchant,
@@ -115,7 +193,7 @@ def render_result(
                     st.error(f"Check the corrected details: {error}")
                     return
                 corrected_response = evaluate_with_progress(
-                    get_agent(),
+                    build_agent(model_label, review_api_key),
                     corrected_request,
                 )
                 corrected_response.audit_trail.append(
@@ -178,24 +256,7 @@ def render_result(
             use_container_width=True,
         )
 
-    with st.expander("Reasoning and audit trail"):
-        if response.reasoning_tree:
-            st.dataframe(
-                [
-                    {
-                        "Depth": node.depth,
-                        "Card": node.card_id,
-                        "Status": node.status,
-                        "Net value (¢)": node.net_value_cents,
-                        "Evidence": node.evidence,
-                    }
-                    for node in response.reasoning_tree
-                ],
-                hide_index=True,
-                use_container_width=True,
-            )
-        for item in response.audit_trail:
-            st.write(f"- {item}")
+    render_evaluation_trace(response)
 
 
 def main() -> None:
@@ -296,19 +357,38 @@ def main() -> None:
         unsafe_allow_html=True,
     )
 
-    with st.form("transaction"):
+    model_label = st.selectbox(
+        "AI model",
+        options=list(MODEL_OPTIONS),
+        key="model_choice",
+        on_change=clear_previous_evaluation,
+        help=(
+            "Choose a local model or a Claude model. Claude requests are sent "
+            "to Anthropic's API."
+        ),
+    )
+    previous_request = st.session_state.get("transaction_request")
+    with st.form("transaction", clear_on_submit=True):
         merchant_col, amount_col = st.columns([1.6, 1], gap="medium")
         with merchant_col:
             merchant_name = st.text_input(
                 "Merchant",
-                value="Trader Joe's",
+                value=(
+                    previous_request.merchant_name
+                    if previous_request is not None
+                    else "Trader Joe's"
+                ),
                 help="Enter a merchant from the catalog or a name for AI-assisted matching.",
             )
         with amount_col:
             amount = st.number_input(
                 "Purchase amount",
                 min_value=0.01,
-                value=75.50,
+                value=(
+                    previous_request.amount
+                    if previous_request is not None
+                    else 75.50
+                ),
                 step=1.0,
                 format="%.2f",
                 help=(
@@ -316,9 +396,27 @@ def main() -> None:
                     "amounts over $50,000."
                 ),
             )
+        api_key = ""
+        if model_label != LOCAL_MODEL_LABEL:
+            api_key = st.text_input(
+                "Anthropic API key",
+                type="password",
+                key="anthropic_api_key",
+                help=(
+                    "Sent directly to Anthropic for this evaluation and cleared "
+                    "when you submit."
+                ),
+            )
         confirm_col, submit_col = st.columns([1.6, 1], gap="medium")
         with confirm_col:
-            is_international = st.checkbox("International purchase")
+            is_international = st.checkbox(
+                "International purchase",
+                value=(
+                    previous_request.is_international
+                    if previous_request is not None
+                    else False
+                ),
+            )
         with submit_col:
             submitted = st.form_submit_button(
                 "Find my best card →",
@@ -327,7 +425,7 @@ def main() -> None:
             )
     st.caption(
         f"Synthetic demo · Illustrative estimates, not financial advice · "
-        f"Model: {default_model_id()}"
+        f"Model: {default_model_id() if model_label == LOCAL_MODEL_LABEL else MODEL_OPTIONS[model_label]}"
     )
 
     if submitted:
@@ -341,13 +439,24 @@ def main() -> None:
             st.error(f"Check the transaction details: {error}")
             return
 
-        response = evaluate_with_progress(get_agent(), request)
         st.session_state["transaction_request"] = request
+        st.session_state["selected_model"] = model_label
+        if model_label != LOCAL_MODEL_LABEL and not api_key.strip():
+            st.error("Enter your Anthropic API key to use a Claude model.")
+            return
+
+        try:
+            agent = build_agent(model_label, api_key)
+        except ValueError as error:
+            st.error(str(error))
+            return
+        response = evaluate_with_progress(agent, request)
         st.session_state["evaluation_response"] = response
 
     response = st.session_state.get("evaluation_response")
     if response is not None:
         st.divider()
+        st.markdown("## --- EVALUATION RESULTS ---")
         request = st.session_state.get("transaction_request")
         blocked_reason = (
             transaction_block_reason(request)
@@ -358,7 +467,11 @@ def main() -> None:
             "Transaction blocked" if blocked_reason is not None else "Recommendation"
         )
         st.markdown(f"### {heading}")
-        render_result(response, request)
+        render_result(
+            response,
+            request,
+            st.session_state.get("selected_model", model_label),
+        )
 
 
 if __name__ == "__main__":
