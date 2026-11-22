@@ -22,7 +22,7 @@ Here’s how the pieces fit together. A LangGraph state graph coordinates the wo
 
 The Context and Rewards stage identifies candidate cards and calculates rewards from the merchant category, card multiplier, and mock point valuation. The Benefits and Risk stage retrieves evidence when the transaction warrants it. The Decision Orchestrator evaluates the candidates, applies hard constraints, and returns a ranked result with alternatives and an audit trail.
 
-Qwen has a few bounded tasks. It can suggest a catalog match for an uncertain merchant, critique the completed reasoning tree, or help explain a result. It can’t create an MCC, change a score, or bypass a constraint. In short, the model helps interpret and communicate; deterministic code handles the numbers.
+The selected language model has a few bounded tasks. In the web app, users can choose local Qwen or an Anthropic Claude model; Qwen is used in the CLI and Colab workflow. The model can suggest a catalog match for an uncertain merchant, critique the completed reasoning tree, or help explain a result. It can’t create an MCC, change a score, or bypass a constraint. In short, the model helps interpret and communicate; deterministic code handles the numbers.
 
 ## Slide 4 — System architecture: reasoning and memory
 
@@ -42,7 +42,7 @@ That lets routine, well-grounded recommendations move quickly while higher-impac
 
 ## Slide 6 — Evaluation and results
 
-For evaluation, I ran the automated test suite. On November nineteenth, twenty twenty-six, all seventy-two collected tests passed. They cover merchant aliases and unresolved names, wallet loading, transaction bounds, reward arithmetic, tree ordering, fee handling and pruning, evidence citations, approval routing, model fallbacks, and the web application.
+For evaluation, I ran the automated test suite. On November twenty-second, twenty twenty-six, all eighty-six collected tests passed. They cover merchant aliases and unresolved names, wallet loading, transaction bounds, reward arithmetic, tree ordering, fee handling and pruning, evidence citations, approval routing, model fallbacks, Claude API handling, and web application behavior.
 
 The grocery example is one check of the arithmetic. Other tests confirm that a document title alone doesn’t count as benefit evidence, international fees are converted correctly, uncertain merchants trigger confirmation, and a model failure still gets a factual fallback.
 
@@ -52,7 +52,7 @@ I want to be careful not to overstate that result. Passing tests show that the c
 
 You can find the project in the public GitHub repository, cloudbyte slash smart-wallet-optimizer. It includes the README, source code, synthetic datasets, tests, and a Colab notebook. The README explains setup and how to run the command-line or web demo. Issuer documents and the local vector index are cached rather than committed.
 
-The implementation uses Python, Pydantic version two, and LangGraph for typed validation and workflow orchestration. Streamlit and the command-line interface share the same workflow. ChromaDB, MiniLM embeddings, and maximal marginal relevance support local retrieval over public issuer guides. A local Qwen three model handles bounded interpretation and language support. Together, these components keep the financial ranking deterministic.
+The implementation uses Python, Pydantic version two, and LangGraph for typed validation and workflow orchestration. Streamlit and the command-line interface share the same workflow. ChromaDB, MiniLM embeddings, and maximal marginal relevance support local retrieval over public issuer guides. The web app offers local Qwen and Claude choices for bounded language tasks. When Claude is selected, the user enters an API key for that operation; the app does not persist it, and the relevant prompt is sent to Anthropic. The web page now presents the evaluation heading, ToT branch table, and audit trail directly beneath the recommendation. Together, these components keep the financial ranking deterministic.
 
 The repository is where you can review the code, examples, tests, and setup instructions. The project is reproducible as an educational prototype, but the test results don’t mean it’s ready for production.
 

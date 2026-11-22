@@ -1,15 +1,14 @@
 # Smart Wallet Rewards Optimizer
 
-A Python demo agent built with LangGraph and an open-weight Qwen3 language
-model. Local runs default to Qwen3-0.6B on CPU; the Colab notebook selects
-Qwen3-4B for GPU-backed runs. LangGraph coordinates three specialized roles:
-context and rewards, benefits and risk, and final decision orchestration. Qwen
-can resolve merchant candidates, critique Tree-of-Thought (ToT) card branches
+A Python demo agent built with LangGraph and deterministic financial logic.
+Local runs use the open-weight Qwen3 model by default; the Streamlit UI also
+supports Anthropic Claude. The Colab notebook selects Qwen3-4B for GPU-backed
+runs. LangGraph coordinates three specialized roles: context and rewards,
+benefits and risk, and final decision orchestration. The selected model can
+resolve merchant candidates, critique Tree-of-Thought (ToT) card branches
 against retrieved evidence, and explain the result. Merchant facts, reward
 calculations, and hard eligibility rules come from tools and deterministic
-code. The Streamlit UI also lets you choose Claude Sonnet 4.5, Haiku 4.5, or
-Opus 4.1 for those bounded language tasks. The project is designed for local
-development and Google Colab.
+code.
 
 > **Disclaimer:** This project uses synthetic wallet data and illustrative
 > benefit estimates for demonstration and educational purposes. It is not
@@ -44,7 +43,9 @@ development and Google Colab.
   an agent-level guardrail when the amount exceeds `$50,000`.
 - Uses the selected Qwen3 or Claude model to resolve ambiguous merchant names,
   critique the reasoning tree, and explain the structured recommendation.
-- Includes an audit trail and structured evaluation tree in the result.
+- Displays an evaluation-results section with the recommendation, alternatives,
+  visible ToT branch table, and audit trail; safety-blocked requests also show
+  their audit details.
 - Records end-to-end evaluation latency and uses safe fallbacks when optional
   model critique or explanation calls fail.
 
@@ -118,7 +119,10 @@ and evaluation logic as the command-line demo. Choose a model using the
 **AI model** selector. The local Qwen option needs no API key; its first
 recommendation may take a few minutes while model weights download. Claude
 options require an Anthropic API key, entered in the password field for each
-evaluation or corrected-context re-evaluation.
+evaluation or corrected-context re-evaluation. Claude Haiku 4.5 is the
+lowest-cost Claude option currently listed; check Anthropic's
+[current API pricing](https://docs.anthropic.com/en/docs/about-claude/pricing)
+for rates and model availability.
 
 The app does not write the Anthropic API key to disk, an environment variable,
 or a persistent client cache; it is held in memory for the submitted operation
@@ -128,6 +132,13 @@ the merchant, transaction amount, catalog candidates, recommendation facts,
 and retrieved benefit excerpts. Anthropic API usage may incur charges under
 your account. Do not enter real financial account data, credentials, or
 personally identifying information.
+
+After an evaluation, the page displays the same key diagnostic sections as the
+Colab/CLI output: **EVALUATION RESULTS**, **ToT Evaluation**, and **Audit
+Trail**. The ToT table shows each evaluated or pruned card branch; the audit
+trail lists workflow events, evidence outcomes, guardrail decisions, and
+latency where recorded. These details remain visible for blocked transactions
+as well as successful recommendations.
 
 ## Recommendation Flow
 
@@ -157,7 +168,7 @@ workflow then performs the full evaluation:
 
 The evaluator scores every wallet branch breadth-first using the deterministic
 rubric `net value = yield + illustrative perk estimate - foreign transaction
-fee`. A Qwen critic assesses the completed tree but its comments are surfaced
+fee`. The selected model assesses the completed tree, but its comments are surfaced
 only when they name a candidate and quote a phrase found in retrieved evidence;
 it never changes the scores or ranking. The response includes the
 recommendation, alternatives, optional `tree_assessment`, LLM-generated

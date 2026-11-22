@@ -104,7 +104,7 @@
                     S -->|Yes| H["Human review"]
                     H -->|corrected context| V
                     O --> A["Structured result + audit"]
-                    Q["Qwen3<br/>bounded interpretation"] -. "catalog match / grounded text" .-> M
+                    Q["Selected model<br/>local Qwen3 or Claude"] -. "catalog match / grounded text" .-> M
                     Q -. "critique / explanation" .-> T
                     style U fill:#e2e3e5,stroke:#41464b
                     style V fill:#cfe2f3,stroke:#084298
@@ -159,9 +159,9 @@
             <h2>What has been verified—and what has not</h2>
             <div class="cols">
                 <div class="panel green">
-                    <div class="stat">72 / 72</div>
-                    <p>Automated tests passed on November 19, 2026.</p>
-                    <p class="small">Coverage includes tools, arithmetic, fees, ToT pruning, RAG citations, escalation, model fallback, and web review.</p>
+                    <div class="stat">86 / 86</div>
+                    <p>Automated tests passed on November 22, 2026.</p>
+                    <p class="small">Coverage includes tools, arithmetic, fees, ToT pruning, RAG citations, escalation, model fallback, Claude API handling, and web review.</p>
                 </div>
                 <div>
                     <h3>Evidence-based result</h3>
@@ -184,7 +184,9 @@
                         <li>Python, Pydantic v2, and LangGraph orchestration.</li>
                         <li>Streamlit interface and CLI over shared agent workflow.</li>
                         <li>ChromaDB, MiniLM embeddings, and public issuer guides for RAG.</li>
-                        <li>Local Qwen3 model for bounded interpretation and language support.</li>
+                        <li>Web model selector: local Qwen3 or Anthropic Claude for bounded language tasks.</li>
+                        <li>Claude API key is entered per operation, not persisted; requests are sent to Anthropic.</li>
+                        <li>Web results show the recommendation, ToT branches, and audit trail.</li>
                     </ul>
                 </div>
                 <div class="panel">
