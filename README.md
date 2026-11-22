@@ -213,19 +213,6 @@ PYTHONPATH=. pytest
 The tests cover merchant and wallet tools, recommendations, breadth-first
 evaluation, fee pruning, low-value early exit, and approval handling.
 
-## Final Capstone Materials
-
-- [Final capstone report (DOCX)](docs/final_capstone_report.docx)
-- [Final capstone report (PDF)](docs/final_capstone_report.pdf)
-- [Presentation slide deck](docs/final_capstone_presentation.html) — use the
-  arrow keys to navigate and the full-screen control for presenting.
-- [Presentation speaker script](docs/final_capstone_speaker_script.md)
-- [Video submission summary template](docs/final_capstone_video_submission.html)
-
-The report's evaluation results reflect the automated test suite, not a
-production accuracy or latency benchmark. A hosted presentation video must
-still be recorded and submitted separately.
-
 ## Project Layout
 
 ```text
